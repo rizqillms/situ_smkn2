@@ -46,6 +46,7 @@ jobs:
           done
           node <<'NODE'
           const assert = require('node:assert/strict');
+          const fs = require('node:fs');
           const base = 'http://127.0.0.1:3210';
           async function call(path, method = 'GET', body, token) {
             const headers = {};
@@ -102,13 +103,29 @@ jobs:
             assert.equal(report.response.status, 200, 'monthly report accessible');
             assert.match(report.data.find(x => x.nama === 'CI Izin').keterangan, /CI test note/, 'monthly note included');
 
-            const backup = await call('/api/backup', 'GET', undefined, admin);
-            assert.equal(backup.response.status, 200, 'SQLite and uploads backup');
-            assert.ok((backup.response.headers.get('content-type') || '').includes('application/zip'), 'backup is a ZIP archive');
-            assert.ok(backup.raw.length > 100, 'backup archive is not empty');
+            const form = new FormData();
+            form.set('nomor', 'CI-UPLOAD-001');
+            form.set('tanggal', '2026-11-10');
+            form.set('dari', 'CI');
+            form.set('perihal', 'Synthetic upload test');
+            form.set('foto', new Blob(['synthetic CI upload content'], { type: 'application/pdf' }), 'ci-test.pdf');
+            const uploadResponse = await fetch(base + '/api/surat-masuk', {
+              method: 'POST', headers: { 'x-auth-token': admin }, body: form
+            });
+            assert.equal(uploadResponse.status, 200, 'authenticated file upload');
+            const letters = await call('/api/surat-masuk', 'GET', undefined, admin);
+            const uploadedFile = letters.data.find(x => x.nomor === 'CI-UPLOAD-001').foto;
+            const anonymousFile = await fetch(base + '/uploads/' + uploadedFile);
+            assert.equal(anonymousFile.status, 401, 'uploaded files require authentication');
+            const authorizedFile = await fetch(base + '/uploads/' + uploadedFile, { headers: { 'x-auth-token': admin } });
+            assert.equal(authorizedFile.status, 200, 'authorized file download');
 
-            const protectedFile = await call('/uploads/no-such-file');
-            assert.equal(protectedFile.response.status, 401, 'uploads require authentication');
+            const backupResponse = await fetch(base + '/api/backup', { headers: { 'x-auth-token': admin } });
+            assert.equal(backupResponse.status, 200, 'SQLite and uploads backup');
+            assert.ok((backupResponse.headers.get('content-type') || '').includes('application/zip'), 'backup is a ZIP archive');
+            const backupBytes = Buffer.from(await backupResponse.arrayBuffer());
+            assert.ok(backupBytes.length > 100, 'backup archive is not empty');
+            fs.writeFileSync('/tmp/situ-smkn2-ci-backup.zip', backupBytes);
 
             const makeGuru = await call('/api/users', 'POST', {
               username: 'ci-guru', password: 'ci-guru-password-2026',
@@ -136,4 +153,20 @@ jobs:
             assert.equal(expired.response.status, 401, 'logout invalidates session');
             console.log('Smoke tests passed: auth, role scope, geofence, attendance notes, exports backup.');
           })().catch(err => { console.error(err); process.exit(1); });
+          NODE
+          unzip -t /tmp/situ-smkn2-ci-backup.zip
+          mkdir -p "$tmpdir/restore"
+          unzip -q /tmp/situ-smkn2-ci-backup.zip -d "$tmpdir/restore"
+          node - "$tmpdir/restore/data.db" "$tmpdir/restore/uploads" <<'NODE'
+          const assert = require('node:assert/strict');
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const Database = require('better-sqlite3');
+          const db = new Database(process.argv[2], { readonly: true });
+          assert.equal(db.pragma('integrity_check', { simple: true }), 'ok', 'restored SQLite integrity');
+          const row = db.prepare("SELECT foto FROM surat_masuk WHERE nomor='CI-UPLOAD-001'").get();
+          assert.ok(row && row.foto, 'uploaded file reference exists in restored database');
+          assert.ok(fs.existsSync(path.join(process.argv[3], row.foto)), 'uploaded file exists in restored uploads folder');
+          db.close();
+          console.log('Backup restore test passed: database and uploaded file are present.');
           NODE
