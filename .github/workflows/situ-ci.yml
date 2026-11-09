@@ -1,0 +1,50 @@
+name: SITU CI
+
+on:
+  push:
+    branches: [main, hardening/phase-1]
+  pull_request:
+    branches: [main]
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: smkn2-git
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Check backend syntax
+        run: node --check server.js
+      - name: Check inline frontend scripts
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          html = Path('public/index.html').read_text(encoding='utf-8')
+          scripts = re.findall(r'<script\\b[^>]*>(.*?)</script>', html, re.S | re.I)
+          inline = [s for s in scripts if s.strip()]
+          for i, script in enumerate(inline, 1):
+              Path(f'/tmp/situ-inline-{i}.js').write_text(script, encoding='utf-8')
+          print(f'Found {len(inline)} inline script(s)')
+          PY
+          for file in /tmp/situ-inline-*.js; do [ -e "$file" ] && node --check "$file"; done
+      - name: Smoke test isolated startup
+        run: |
+          tmpdir="$(mktemp -d)"
+          PORT=3210 DATA_DIR="$tmpdir" BOOTSTRAP_ADMIN_USERNAME=ci-admin BOOTSTRAP_ADMIN_PASSWORD='ci-only-password-2026' node server.js > "$tmpdir/server.log" 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true; rm -rf "$tmpdir"' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3210/healthz; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "$tmpdir/server.log"
+          exit 1
