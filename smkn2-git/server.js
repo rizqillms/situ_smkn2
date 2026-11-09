@@ -7,18 +7,23 @@ const multer = require('multer');
 const PDFDocument = require('pdfkit');
 const ExcelJS = require('exceljs');
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Database
-const dbPath = path.join(__dirname, 'data.db');
+const dataDir = process.env.DATA_DIR || __dirname;
+if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+const dbPath = path.join(dataDir, 'data.db');
 const db = new Database(dbPath);
+db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 5000');
 
 // Init tables
 db.exec(`
@@ -97,13 +102,41 @@ if (!absColsGps.includes('gps_accuracy')) db.exec("ALTER TABLE absensi ADD COLUM
 
 // Helpers
 function hashPass(pw) {
-  return crypto.createHash('sha256').update(pw + ':smkn2salt').digest('hex');
+  return bcrypt.hashSync(String(pw), 12);
+}
+function verifyPass(pw, stored) {
+  if (typeof stored !== 'string') return false;
+  if (stored.startsWith('$2')) return bcrypt.compareSync(String(pw), stored);
+  const legacy = crypto.createHash('sha256').update(String(pw) + ':smkn2salt').digest('hex');
+  const candidate = Buffer.from(stored);
+  return candidate.length === Buffer.byteLength(legacy) && crypto.timingSafeEqual(Buffer.from(legacy), candidate);
+}
+function schoolDateTime(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Makassar', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+  }).formatToParts(date).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
+  return { date: parts.year + '-' + parts.month + '-' + parts.day, time: parts.hour + ':' + parts.minute };
+}
+const SCHOOL_LOCATION = Object.freeze({ lat: -2.9317903, lng: 115.1820055 });
+const ATTENDANCE_RADIUS_METERS = 300;
+function distanceMeters(lat1, lng1, lat2, lng2) {
+  const rad = value => value * Math.PI / 180;
+  const dLat = rad(lat2 - lat1), dLng = rad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 function getUser(req) {
   const token = req.headers['x-auth-token'] || req.query.token;
-  if (!token) return null;
-  const row = db.prepare('SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=?').get(token);
-  return row || null;
+  if (!token || typeof token !== 'string') return null;
+  const row = db.prepare('SELECT u.*, s.expires_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=?').get(token);
+  if (!row) return null;
+  if (!row.expires_at || new Date(row.expires_at).getTime() <= Date.now()) {
+    db.prepare('DELETE FROM sessions WHERE token=?').run(token);
+    return null;
+  }
+  delete row.expires_at;
+  return row;
 }
 function requireAuth(req, res, next) {
   const user = getUser(req);
