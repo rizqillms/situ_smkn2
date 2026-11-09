@@ -118,6 +118,24 @@ function schoolDateTime(date = new Date()) {
   }).formatToParts(date).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
   return { date: parts.year + '-' + parts.month + '-' + parts.day, time: parts.hour + ':' + parts.minute };
 }
+const loginFailures = new Map();
+function isLoginBlocked(ip) {
+  const now = Date.now();
+  const entry = loginFailures.get(ip);
+  if (!entry || now - entry.windowStart > 15 * 60 * 1000) {
+    loginFailures.delete(ip);
+    return false;
+  }
+  return entry.blockedUntil > now;
+}
+function recordLoginFailure(ip) {
+  const now = Date.now();
+  let entry = loginFailures.get(ip);
+  if (!entry || now - entry.windowStart > 15 * 60 * 1000) entry = { count: 0, windowStart: now, blockedUntil: 0 };
+  entry.count += 1;
+  if (entry.count >= 8) entry.blockedUntil = now + 15 * 60 * 1000;
+  loginFailures.set(ip, entry);
+}
 const SCHOOL_LOCATION = Object.freeze({ lat: -2.9317903, lng: 115.1820055 });
 const ATTENDANCE_RADIUS_METERS = 300;
 function distanceMeters(lat1, lng1, lat2, lng2) {
@@ -177,13 +195,17 @@ if (userCount.c === 0) {
 // ========== AUTH ==========
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  if (isLoginBlocked(ip)) return res.status(429).json({ error: 'Terlalu banyak percobaan login. Coba lagi dalam 15 menit.' });
   if (typeof username !== 'string' || typeof password !== 'string' || username.length > 100 || password.length > 200) {
     return res.status(400).json({ error: 'Input login tidak valid' });
   }
   const user = db.prepare('SELECT * FROM users WHERE username=?').get(username);
   if (!user || !verifyPass(password, user.password_hash)) {
+    recordLoginFailure(ip);
     return res.status(401).json({ error: 'Username atau password salah' });
   }
+  loginFailures.delete(ip);
   if (!user.password_hash.startsWith('$2')) {
     db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hashPass(password), user.id);
   }
@@ -523,12 +545,25 @@ app.get('/api/users', requireRole('admin','kasubag'), (req, res) => {
 });
 app.post('/api/users', requireRole('admin','kasubag'), (req, res) => {
   const { username, password, nama, role, pegawai_id } = req.body;
-  if (typeof username !== 'string' || !/^[a-zA-Z0-9._-]{3,50}$/.test(username) || typeof password !== 'string' || password.length < 12 || password.length > 200) return res.status(400).json({ error: 'Username harus 3-50 karakter dan password minimal 12 karakter' });
+  const assignedRole = role || 'guru';
+  const allowedRoles = req.user.role === 'admin'
+    ? ['admin', 'kepsek', 'kasubag', 'staff', 'guru']
+    : ['staff', 'guru'];
+  if (typeof username !== 'string' || !/^[a-zA-Z0-9._-]{3,50}$/.test(username) ||
+      typeof password !== 'string' || password.length < 12 || password.length > 200) {
+    return res.status(400).json({ error: 'Username harus 3-50 karakter dan password minimal 12 karakter' });
+  }
+  if (!allowedRoles.includes(assignedRole)) return res.status(403).json({ error: 'Role tersebut tidak boleh dibuat oleh akun ini' });
+  const pegawaiId = pegawai_id ? Number(pegawai_id) : null;
+  if (pegawaiId !== null && (!Number.isInteger(pegawaiId) || !db.prepare('SELECT id FROM pegawai WHERE id=?').get(pegawaiId))) {
+    return res.status(400).json({ error: 'Pegawai yang dipilih tidak valid' });
+  }
+  if (assignedRole === 'guru' && !pegawaiId) return res.status(400).json({ error: 'Akun guru harus terhubung ke data pegawai' });
   const exists = db.prepare('SELECT id FROM users WHERE username=?').get(username);
   if (exists) return res.status(400).json({ error: 'Username sudah dipakai' });
   db.prepare('INSERT INTO users (username,password_hash,nama,role,pegawai_id) VALUES (?,?,?,?,?)')
-    .run(username, hashPass(password), nama || username, role || 'guru', pegawai_id || null);
-  log(req.user, 'User', `Buat akun ${username} (${role})`);
+    .run(username, hashPass(password), nama || username, assignedRole, pegawaiId);
+  log(req.user, 'User', 'Buat akun ' + username + ' (' + assignedRole + ')');
   res.json({ ok: true });
 });
 app.put('/api/users/:id/reset-password', requireRole('admin','kasubag'), (req, res) => {
