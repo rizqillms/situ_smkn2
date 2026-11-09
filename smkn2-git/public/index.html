@@ -516,8 +516,8 @@ async function loadRekapSurat(){
   const d=await api('/api/rekap/surat?bulan='+b).then(r=>r.json());
   document.getElementById('rk-sm-total').textContent=d.totalMasuk||0;
   document.getElementById('rk-sk-total').textContent=d.totalKeluar||0;
-  document.getElementById('list-rk-sm').innerHTML=(d.masukRinci||[]).map(r=>`<tr><td>${r.dari}</td><td>${r.total}</td><td>${r.perihal||'-'}</td></tr>`).join('')||'<tr><td colspan="3" style="text-align:center;color:#94a3b8;">Tidak ada surat masuk bulan ini</td></tr>';
-  document.getElementById('list-rk-sk').innerHTML=(d.keluarRinci||[]).map(r=>`<tr><td>${r.tujuan}</td><td>${r.total}</td><td>${r.perihal||'-'}</td></tr>`).join('')||'<tr><td colspan="3" style="text-align:center;color:#94a3b8;">Tidak ada surat keluar bulan ini</td></tr>';
+  document.getElementById('list-rk-sm').innerHTML=(d.masukRinci||[]).map(r=>`<tr><td>${esc(r.dari)}</td><td>${Number(r.total)||0}</td><td>${esc(r.perihal||'-')}</td></tr>`).join('')||'<tr><td colspan="3" style="text-align:center;color:#94a3b8;">Tidak ada surat masuk bulan ini</td></tr>';
+  document.getElementById('list-rk-sk').innerHTML=(d.keluarRinci||[]).map(r=>`<tr><td>${esc(r.tujuan)}</td><td>${Number(r.total)||0}</td><td>${esc(r.perihal||'-')}</td></tr>`).join('')||'<tr><td colspan="3" style="text-align:center;color:#94a3b8;">Tidak ada surat keluar bulan ini</td></tr>';
 }
 async function loadRekapPegawai(){
   const d=await api('/api/rekap/pegawai').then(r=>r.json());
@@ -528,7 +528,7 @@ async function loadRekapPegawai(){
   document.getElementById('rk-pg-honorer').textContent=st['Guru Non ASN']||st.Honorer;
   const pjEl=document.getElementById('rk-pg-pjlp'); if(pjEl) pjEl.textContent=st.PJLP;
   // (rekap pegawai: hanya total per status + daftar semua pegawai)
-  document.getElementById('list-rk-pg').innerHTML=(d.semua||[]).map(r=>`<tr><td>${r.nama}</td><td>${r.jenis_kelamin||'-'}</td><td>${r.nip||'-'}</td><td>${r.golongan||'-'}</td><td>${r.jabatan||'-'}</td><td>${r.jenis||r.status||'-'}</td><td>${r.agama||'-'}</td><td>${r.pendidikan||'-'}</td><td>${r.no_hp||'-'}</td><td>${r.periode_tahun?r.periode_tahun+'-'+String(r.periode_bulan||'').padStart(2,'0'):'-'}</td><td>${r.tanggal_naik_pangkat||'-'}</td></tr>`).join('');
+  document.getElementById('list-rk-pg').innerHTML=(d.semua||[]).map(r=>`<tr><td>${esc(r.nama)}</td><td>${esc(r.jenis_kelamin||'-')}</td><td>${esc(r.nip||'-')}</td><td>${esc(r.golongan||'-')}</td><td>${esc(r.jabatan||'-')}</td><td>${esc(r.jenis||r.status||'-')}</td><td>${esc(r.agama||'-')}</td><td>${esc(r.pendidikan||'-')}</td><td>${esc(r.no_hp||'-')}</td><td>${r.periode_tahun?esc(r.periode_tahun+'-'+String(r.periode_bulan||'').padStart(2,'0')):'-'}</td><td>${esc(r.tanggal_naik_pangkat||'-')}</td></tr>`).join('');
 }
 function exportSuratExcel(){ const b=document.getElementById('bulan-surat').value||document.getElementById('bulan').value; return downloadProtected('/api/rekap/surat/excel?bulan='+encodeURIComponent(b),'rekap-surat.xlsx'); }
 function exportPegawaiExcel(){ return downloadProtected('/api/rekap/pegawai/excel','rekap-pegawai.xlsx'); }
@@ -694,14 +694,14 @@ function doBackup(){ return downloadProtected('/api/backup','backup-smkn2.zip');
 let divisiList = [];
 async function loadDivisi(){
   divisiList = await api('/api/divisi').then(r=>r.json()).catch(()=>[]);
-  document.getElementById('lap-divisi').innerHTML = divisiList.map(d=>`<option>${d}</option>`).join('');
+  document.getElementById('lap-divisi').innerHTML = divisiList.map(d=>`<option>${esc(d)}</option>`).join('');
 }
 async function loadPegawaiLap(){
   const pg = await api('/api/pegawai').then(r=>r.json()).catch(()=>[]);
   const sel = document.getElementById('lap-pegawai');
   let list = pg;
   if (currentUser.pegawai_id) list = pg.filter(p=>p.id===currentUser.pegawai_id);
-  sel.innerHTML = list.map(p=>`<option value="${p.id}">${p.nama}</option>`).join('');
+  sel.innerHTML = list.map(p=>`<option value="${Number(p.id)}">${esc(p.nama)}</option>`).join('');
   document.getElementById('lap-bulan').value = document.getElementById('bulan-lap').value || new Date().toISOString().slice(0,7);
 }
 async function loadLaporan(){
@@ -750,7 +750,7 @@ async function simpanNilai(id){
 // ===== PENGGUNA =====
 async function loadUsers(){
   const pg = await api('/api/pegawai').then(r=>r.json()).catch(()=>[]);
-  document.getElementById('user-pegawai').innerHTML = '<option value="">-- Tidak dihubungkan --</option>' + pg.map(p=>`<option value="${p.id}">${p.nama}</option>`).join('');
+  document.getElementById('user-pegawai').innerHTML = '<option value="">-- Tidak dihubungkan --</option>' + pg.map(p=>`<option value="${Number(p.id)}">${esc(p.nama)}</option>`).join('');
   const rows = await api('/api/users').then(r=>r.json()).catch(()=>[]);
   document.getElementById('list-users').innerHTML = rows.map(u=>`<tr><td><b>${esc(u.username)}</b></td><td>${esc(u.nama)}</td><td>${esc(u.role)}</td><td style="white-space:nowrap;"><button class="btn btn-small" onclick="resetPass(${u.id})">Reset Password</button> <button class="btn btn-small" style="background:#ef4444;" onclick="hapusUser(${u.id})">Hapus</button></td></tr>`).join('');
 }
