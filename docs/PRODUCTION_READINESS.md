@@ -34,6 +34,8 @@ Dokumen ini menjadi catatan kerja teknis dan gerbang sebelum aplikasi digunakan 
 
 ### File dan operasional
 - Upload dibatasi maksimum 10 MB dan daftar ekstensi yang diizinkan.
+- Multer dinaikkan ke 2.5.0 dan body-parser yang terkunci di lockfile ke 1.20.9; CI menjalankan npm audit untuk dependency produksi dengan ambang high.
+- Data dinamis pada tabel/dashboard di-escape sebelum dimasukkan ke HTML.
 - File unggahan hanya dapat diakses dengan session aktif.
 - DATA_DIR memisahkan database dan file unggahan dari source code.
 - Backup menggunakan SQLite online backup dan mengemas database serta folder unggahan menjadi satu ZIP.
