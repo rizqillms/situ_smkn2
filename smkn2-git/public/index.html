@@ -498,7 +498,7 @@ async function doAbsen(id,status){
   if (status !== 'Hadir') return submit();
   if (!navigator.geolocation) { toast('Browser tidak mendukung GPS.'); return; }
   navigator.geolocation.getCurrentPosition(
-    position => submit({ lat: position.coords.latitude, lng: position.coords.longitude, accuracy: position.coords.accuracy }),
+    position => submit({ lat: position.coords.latitude, lng: position.coords.longitude }),
     error => toast(error.code === 1 ? 'Izin lokasi ditolak. Aktifkan akses lokasi untuk absensi hadir.' : 'Lokasi GPS belum tersedia. Coba lagi di area terbuka.'),
     { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
   );
