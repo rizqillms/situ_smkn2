@@ -402,8 +402,14 @@ const token = localStorage.getItem('token');
 if (!token) window.location.href = '/login.html';
 let currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 const role = currentUser.role || 'guru';
-function api(path, opts={}) {
-  return fetch(path, { ...opts, headers: { ...(opts.headers||{}), 'x-auth-token': token } });
+async function api(path, opts={}) {
+  const response = await fetch(path, { ...opts, headers: { ...(opts.headers||{}), 'x-auth-token': token } });
+  if (response.status === 401 && path !== '/api/login') {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = '/login.html';
+  }
+  return response;
 }
 function logout(){ api('/api/logout',{method:'POST',headers:{'x-auth-token':token}}).finally(()=>{ localStorage.removeItem('token'); localStorage.removeItem('user'); window.location.href='/login.html'; }); }
 document.getElementById('today-date').textContent = new Date().toLocaleDateString('id-ID', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
