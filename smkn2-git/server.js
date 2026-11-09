@@ -639,12 +639,17 @@ app.get('/api/log', requireRole('admin','kasubag','kepsek'), (req, res) => {
 });
 
 // ========== BACKUP ==========
-app.get('/api/backup', requireRole('admin','kasubag'), (req, res) => {
-  const stamp = new Date().toISOString().slice(0,10);
-  const dest = path.join(__dirname, `backup-${stamp}.db`);
-  fs.copyFileSync(dbPath, dest);
-  log(req.user, 'Backup', `Download backup database ${stamp}`);
-  res.download(dest, `backup-smkn2-${stamp}.db`);
+app.get('/api/backup', requireRole('admin','kasubag'), async (req, res, next) => {
+  const stamp = schoolDateTime().date;
+  const dest = path.join(dataDir, `backup-${stamp}-${Date.now()}.db`);
+  try {
+    await db.backup(dest);
+    log(req.user, 'Backup', `Download backup database ${stamp}`);
+    res.download(dest, `backup-smkn2-${stamp}.db`, err => {
+      if (err && !res.headersSent) next(err);
+      fs.promises.unlink(dest).catch(() => {});
+    });
+  } catch (err) { next(err); }
 });
 
 // Demo personnel are intentionally not inserted into operational databases.
