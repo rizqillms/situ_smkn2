@@ -109,8 +109,6 @@ if (!pgCols.includes('agama')) db.exec("ALTER TABLE pegawai ADD COLUMN agama TEX
 if (!pgCols.includes('pendidikan')) db.exec("ALTER TABLE pegawai ADD COLUMN pendidikan TEXT");
 if (!pgCols.includes('periode_tahun')) db.exec("ALTER TABLE pegawai ADD COLUMN periode_tahun TEXT");
 if (!pgCols.includes('periode_bulan')) db.exec("ALTER TABLE pegawai ADD COLUMN periode_bulan TEXT");
-const absColsGps = db.prepare("PRAGMA table_info(absensi)").all().map(c => c.name);
-if (!absColsGps.includes('gps_accuracy')) db.exec("ALTER TABLE absensi ADD COLUMN gps_accuracy REAL");
 
 // Helpers
 function hashPass(pw) {
@@ -411,7 +409,7 @@ app.get('/api/absensi', requireAuth, (req, res) => {
   res.json(rows);
 });
 app.post('/api/absensi', requireAuth, (req, res) => {
-  const { pegawai_id, status, lat, lng, accuracy, keterangan } = req.body;
+  const { pegawai_id, status, lat, lng, keterangan } = req.body;
   if (!['Hadir', 'Izin', 'Sakit'].includes(status)) return res.status(400).json({ error: 'Status absensi tidak valid' });
   const pegawaiId = Number(pegawai_id);
   if (!Number.isInteger(pegawaiId) || pegawaiId <= 0) return res.status(400).json({ error: 'Pegawai tidak valid' });
@@ -423,7 +421,6 @@ app.post('/api/absensi', requireAuth, (req, res) => {
   if (note.length > 1000) return res.status(400).json({ error: 'Keterangan maksimal 1000 karakter' });
 
   let distance = null;
-  const gpsAccuracy = Number.isFinite(Number(accuracy)) && Number(accuracy) >= 0 ? Number(accuracy) : null;
   if (status === 'Hadir') {
     const latitude = Number(lat), longitude = Number(lng);
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
@@ -439,9 +436,9 @@ app.post('/api/absensi', requireAuth, (req, res) => {
   if (db.prepare('SELECT id FROM absensi WHERE pegawai_id=? AND tanggal=?').get(pegawaiId, now.date)) {
     return res.status(409).json({ error: 'Pegawai sudah melakukan absensi hari ini' });
   }
-  db.prepare('INSERT INTO absensi (pegawai_id,tanggal,jam,status,telat_menit,lat,lng,keterangan,gps_accuracy) VALUES (?,?,?,?,?,?,?,?,?)')
+  db.prepare('INSERT INTO absensi (pegawai_id,tanggal,jam,status,telat_menit,lat,lng,keterangan) VALUES (?,?,?,?,?,?,?,?)')
     .run(pegawaiId, now.date, now.time, status, lateMinutes, status === 'Hadir' ? Number(lat) : null,
-      status === 'Hadir' ? Number(lng) : null, note || null, gpsAccuracy);
+      status === 'Hadir' ? Number(lng) : null, note || null);
   log(req.user, 'Absensi', 'Absensi ' + status + ' tanggal ' + now.date + ' jam ' + now.time +
     (lateMinutes ? ' (telat ' + lateMinutes + ' menit)' : '') +
     (distance !== null ? ' jarak ' + Math.round(distance) + ' meter' : ''));
