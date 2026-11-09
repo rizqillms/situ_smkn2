@@ -664,27 +664,54 @@ app.post('/api/pegawai/import', requireRole('admin','kasubag'), upload.single('f
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.readFile(req.file.path);
     const ws = wb.worksheets[0];
+    // Format Excel asli SMKN 2 Rantau: header baris 17, data mulai baris 19
+    // Kolom: NO | NAMA | NUPTK | JENIS KELAMIN | TEMPAT LAHIR | TANGGAL LAHIR | NIP | STATUS KEPEGAWAIAN | JENIS PTK | AGAMA | ... | PENDIDIKAN TERAKHIR | ... | NOMOR TELEPON/HP | ... | Usul Naik Pangkat
+    const BULAN = { januari:1, februari:2, maret:3, april:4, mei:5, juni:6, juli:7, agustus:8, september:9, oktober:10, november:11, desember:12 };
+    const parseTanggal = (s) => {
+      if (!s) return null;
+      s = String(s).trim();
+      const m = s.match(/(\d{1,2})\s*(\w+)\s*(\d{4})/i);
+      if (m) {
+        const bln = BULAN[m[2].toLowerCase()];
+        if (bln) return `${m[3]}-${String(bln).padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+      }
+      const m2 = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+      if (m2) return `${m2[1]}-${m2[2].padStart(2,'0')}-${m2[3].padStart(2,'0')}`;
+      const m3 = s.match(/(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/);
+      if (m3) return `${m3[3]}-${m3[2].padStart(2,'0')}-${m3[1].padStart(2,'0')}`;
+      return s;
+    };
     const rows = [];
     ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-      if (rowNumber < 2) return; // skip header
+      if (rowNumber < 19) return;
       const v = row.values; // 1-indexed
-      const get = (i) => v[i] ? String(v[i]).trim() : '';
+      const get = (i) => v[i] != null ? String(v[i]).trim() : '';
       const nama = get(2);
-      if (!nama || nama.toLowerCase() === 'nama') return;
+      if (!nama || nama.toLowerCase() === 'nama' || nama === '2.0') return;
+      let jenis = get(8) || 'PJLP';
+      if (jenis.toLowerCase().includes('pppk')) jenis = 'PPPK';
+      const nipRaw = get(7);
+      const nip = (nipRaw === '-' || nipRaw === '') ? null : nipRaw;
+      const usul = get(18);
+      let periode_tahun = null, periode_bulan = null;
+      if (usul && /^\d{4}$/.test(usul)) {
+        periode_tahun = String(Number(usul) - 4);
+        periode_bulan = '1';
+      }
       rows.push({
         nama,
-        jenis_kelamin: get(3) || null,
-        tempat_lahir: get(4) || null,
-        tanggal_lahir: get(5) || null, // format YYYY-MM-DD disarankan
-        nip: get(6) || null,
-        jenis_pegawai: get(7) || 'PJLP',
-        jabatan: get(8) || null,
-        agama: get(9) || null,
-        pendidikan: get(10) || null,
-        no_hp: get(11) || null,
-        golongan: get(12) || null,
-        periode_tahun: get(13) || null,
-        periode_bulan: get(14) || null,
+        jenis_kelamin: get(4) || null,
+        tempat_lahir: get(5) || null,
+        tanggal_lahir: parseTanggal(get(6)),
+        nip,
+        jenis_pegawai: jenis,
+        jabatan: get(9) || null,
+        agama: get(10) || null,
+        pendidikan: get(12) || null,
+        no_hp: get(16) || null,
+        golongan: null,
+        periode_tahun,
+        periode_bulan,
       });
     });
     const ins = db.prepare(`INSERT INTO pegawai (nama,jenis_kelamin,tempat_lahir,tanggal_lahir,nip,jenis_pegawai,status,jabatan,agama,pendidikan,no_hp,golongan,periode_tahun,periode_bulan)
