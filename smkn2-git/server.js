@@ -572,18 +572,30 @@ app.post('/api/users', requireRole('admin','kasubag'), (req, res) => {
 app.put('/api/users/:id/reset-password', requireRole('admin','kasubag'), (req, res) => {
   const { password } = req.body;
   if (typeof password !== 'string' || password.length < 12 || password.length > 200) return res.status(400).json({ error: 'Password minimal 12 karakter' });
-  db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hashPass(password), req.params.id);
-  log(req.user, 'User', `Reset password user id ${req.params.id}`);
+  const target = db.prepare('SELECT id, role FROM users WHERE id=?').get(req.params.id);
+  if (!target) return res.status(404).json({ error: 'Akun tidak ditemukan' });
+  if (req.user.role === 'kasubag' && ['admin', 'kepsek', 'kasubag'].includes(target.role)) {
+    return res.status(403).json({ error: 'Kasubag hanya dapat reset akun guru dan staff' });
+  }
+  db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hashPass(password), target.id);
+  db.prepare('DELETE FROM sessions WHERE user_id=?').run(target.id);
+  log(req.user, 'User', 'Reset password user id ' + target.id);
   res.json({ ok: true });
 });
 app.delete('/api/users/:id', requireRole('admin','kasubag'), (req, res) => {
-  if (Number(req.params.id) === req.user.id) return res.status(400).json({ error: 'Tidak bisa hapus akun sendiri' });
-  db.prepare('DELETE FROM sessions WHERE user_id=?').run(req.params.id);
-  db.prepare('DELETE FROM users WHERE id=?').run(req.params.id);
-  log(req.user, 'User', `Hapus akun id ${req.params.id}`);
+  const targetId = Number(req.params.id);
+  if (!Number.isInteger(targetId) || targetId <= 0) return res.status(400).json({ error: 'ID akun tidak valid' });
+  if (targetId === req.user.id) return res.status(400).json({ error: 'Tidak bisa hapus akun sendiri' });
+  const target = db.prepare('SELECT id, role FROM users WHERE id=?').get(targetId);
+  if (!target) return res.status(404).json({ error: 'Akun tidak ditemukan' });
+  if (req.user.role === 'kasubag' && ['admin', 'kepsek', 'kasubag'].includes(target.role)) {
+    return res.status(403).json({ error: 'Kasubag hanya dapat menghapus akun guru dan staff' });
+  }
+  db.prepare('DELETE FROM sessions WHERE user_id=?').run(targetId);
+  db.prepare('DELETE FROM users WHERE id=?').run(targetId);
+  log(req.user, 'User', 'Hapus akun id ' + targetId);
   res.json({ ok: true });
 });
-
 // ========== LAPORAN BULANAN ==========
 const DIVISI = ["Administrasi Kesiswaan","Administrasi Keuangan","Administrasi Kurikulum","Dapodik","HUMAS","Keamanan dan Kebersihan","Kepegawaian","Persuratan dan Kearsipan","SARPRAS"];
 app.get('/api/divisi', requireAuth, (req, res) => res.json(DIVISI));
