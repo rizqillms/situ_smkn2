@@ -7,18 +7,36 @@ const multer = require('multer');
 const PDFDocument = require('pdfkit');
 const ExcelJS = require('exceljs');
 const crypto = require('crypto');
+const os = require('os');
+const archiver = require('archiver');
+const bcrypt = require('bcryptjs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const trustProxyHops = Number(process.env.TRUST_PROXY_HOPS || 0);
+if (Number.isInteger(trustProxyHops) && trustProxyHops > 0) app.set('trust proxy', trustProxyHops);
+app.disable('x-powered-by');
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Permissions-Policy', 'geolocation=(self)');
+  if (req.path.startsWith('/api/')) res.setHeader('Cache-Control', 'no-store');
+  next();
+});
 
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Database
-const dbPath = path.join(__dirname, 'data.db');
+const dataDir = process.env.DATA_DIR || __dirname;
+if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+const dbPath = path.join(dataDir, 'data.db');
 const db = new Database(dbPath);
+db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 5000');
 
 // Init tables
 db.exec(`
@@ -95,13 +113,59 @@ if (!pgCols.includes('periode_bulan')) db.exec("ALTER TABLE pegawai ADD COLUMN p
 
 // Helpers
 function hashPass(pw) {
-  return crypto.createHash('sha256').update(pw + ':smkn2salt').digest('hex');
+  return bcrypt.hashSync(String(pw), 12);
+}
+function verifyPass(pw, stored) {
+  if (typeof stored !== 'string') return false;
+  if (stored.startsWith('$2')) return bcrypt.compareSync(String(pw), stored);
+  const legacy = crypto.createHash('sha256').update(String(pw) + ':smkn2salt').digest('hex');
+  const candidate = Buffer.from(stored);
+  return candidate.length === Buffer.byteLength(legacy) && crypto.timingSafeEqual(Buffer.from(legacy), candidate);
+}
+function schoolDateTime(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Makassar', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+  }).formatToParts(date).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
+  return { date: parts.year + '-' + parts.month + '-' + parts.day, time: parts.hour + ':' + parts.minute };
+}
+const loginFailures = new Map();
+function isLoginBlocked(ip) {
+  const now = Date.now();
+  const entry = loginFailures.get(ip);
+  if (!entry || now - entry.windowStart > 15 * 60 * 1000) {
+    loginFailures.delete(ip);
+    return false;
+  }
+  return entry.blockedUntil > now;
+}
+function recordLoginFailure(ip) {
+  const now = Date.now();
+  let entry = loginFailures.get(ip);
+  if (!entry || now - entry.windowStart > 15 * 60 * 1000) entry = { count: 0, windowStart: now, blockedUntil: 0 };
+  entry.count += 1;
+  if (entry.count >= 8) entry.blockedUntil = now + 15 * 60 * 1000;
+  loginFailures.set(ip, entry);
+}
+const SCHOOL_LOCATION = Object.freeze({ lat: -2.9317903, lng: 115.1820055 });
+const ATTENDANCE_RADIUS_METERS = 300;
+function distanceMeters(lat1, lng1, lat2, lng2) {
+  const rad = value => value * Math.PI / 180;
+  const dLat = rad(lat2 - lat1), dLng = rad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 function getUser(req) {
-  const token = req.headers['x-auth-token'] || req.query.token;
-  if (!token) return null;
-  const row = db.prepare('SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=?').get(token);
-  return row || null;
+  const token = req.headers['x-auth-token'];
+  if (!token || typeof token !== 'string') return null;
+  const row = db.prepare('SELECT u.*, s.expires_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=?').get(token);
+  if (!row) return null;
+  if (!row.expires_at || new Date(row.expires_at).getTime() <= Date.now()) {
+    db.prepare('DELETE FROM sessions WHERE token=?').run(token);
+    return null;
+  }
+  delete row.expires_at;
+  return row;
 }
 function requireAuth(req, res, next) {
   const user = getUser(req);
@@ -128,26 +192,33 @@ function log(user, aksi, detail) {
 // Seed users if empty
 const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get();
 if (userCount.c === 0) {
-  const ins = db.prepare('INSERT INTO users (username,password_hash,nama,role) VALUES (?,?,?,?)');
-  ins.run('admin', hashPass('admin123'), 'Administrator', 'admin');
-  ins.run('kepsek', hashPass('kepsek123'), 'Kepala Sekolah', 'kepsek');
-  ins.run('kasubag', hashPass('kasubag123'), 'Kasubag TU', 'kasubag');
-  ins.run('staff', hashPass('staff123'), 'Staff TU', 'staff');
-  const insG = db.prepare('INSERT INTO users (username,password_hash,nama,role,pegawai_id) VALUES (?,?,?,?,?)');
-  insG.run('budi', hashPass('guru123'), 'Budi Santoso, S.Pd', 'guru', 1);
-  insG.run('siti', hashPass('guru123'), 'Siti Rahayu, M.Pd', 'guru', 2);
-  insG.run('ahmad', hashPass('guru123'), 'Ahmad Yani, S.Pd', 'guru', 3);
-  insG.run('dewi', hashPass('guru123'), 'Dewi Lestari, S.Pd', 'guru', 4);
-  insG.run('rudi', hashPass('guru123'), 'Rudi Hermawan, S.Pd', 'guru', 5);
-  insG.run('fitri', hashPass('guru123'), 'Fitri Handayani, S.Pd', 'guru', 6);
+  const username = process.env.BOOTSTRAP_ADMIN_USERNAME;
+  const password = process.env.BOOTSTRAP_ADMIN_PASSWORD;
+  if (username && password && password.length >= 12) {
+    db.prepare('INSERT INTO users (username,password_hash,nama,role) VALUES (?,?,?,?)')
+      .run(username, hashPass(password), 'Administrator', 'admin');
+    console.log('Bootstrap administrator created from environment configuration.');
+  } else {
+    console.warn('No users exist. Configure BOOTSTRAP_ADMIN_USERNAME and BOOTSTRAP_ADMIN_PASSWORD (12+ chars) before first start.');
+  }
 }
 
 // ========== AUTH ==========
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  if (isLoginBlocked(ip)) return res.status(429).json({ error: 'Terlalu banyak percobaan login. Coba lagi dalam 15 menit.' });
+  if (typeof username !== 'string' || typeof password !== 'string' || username.length > 100 || password.length > 200) {
+    return res.status(400).json({ error: 'Input login tidak valid' });
+  }
   const user = db.prepare('SELECT * FROM users WHERE username=?').get(username);
-  if (!user || user.password_hash !== hashPass(password)) {
+  if (!user || !verifyPass(password, user.password_hash)) {
+    recordLoginFailure(ip);
     return res.status(401).json({ error: 'Username atau password salah' });
+  }
+  loginFailures.delete(ip);
+  if (!user.password_hash.startsWith('$2')) {
+    db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hashPass(password), user.id);
   }
   const token = crypto.randomBytes(32).toString('hex');
   const expires = new Date(Date.now() + 24*60*60*1000).toISOString();
@@ -167,21 +238,29 @@ app.get('/api/me', (req, res) => {
 });
 app.post('/api/ganti-password', requireAuth, (req, res) => {
   const { lama, baru } = req.body;
-  if (!baru || baru.length < 6) return res.status(400).json({ error: 'Password baru minimal 6 karakter' });
-  if (req.user.password_hash !== hashPass(lama)) return res.status(400).json({ error: 'Password lama salah' });
+  if (typeof baru !== 'string' || baru.length < 12 || baru.length > 200) return res.status(400).json({ error: 'Password baru minimal 12 karakter' });
+  if (!verifyPass(lama, req.user.password_hash)) return res.status(400).json({ error: 'Password lama salah' });
   db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hashPass(baru), req.user.id);
   log(req.user, 'Ganti Password', 'Password berhasil diganti');
   res.json({ ok: true });
 });
 
 // Upload config
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
-const upload = multer({ dest: uploadsDir });
-app.use('/uploads', express.static(uploadsDir));
-
+const uploadsDir = path.join(dataDir, 'uploads');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+const upload = multer({
+  dest: uploadsDir,
+  limits: { fileSize: 10 * 1024 * 1024, files: 2 },
+  fileFilter(req, file, cb) {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const allowed = ['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.csv'];
+    if (!allowed.includes(ext)) return cb(new Error('Jenis file tidak diizinkan'));
+    cb(null, true);
+  }
+});
+app.use('/uploads', requireAuth, express.static(uploadsDir, { dotfiles: 'deny', index: false }));
 // ========== SURAT MASUK ==========
-app.get('/api/surat-masuk', requireAuth, (req, res) => {
+app.get('/api/surat-masuk', requireRole('admin','kasubag','staff','kepsek'), (req, res) => {
   const rows = db.prepare('SELECT * FROM surat_masuk ORDER BY tanggal DESC').all();
   res.json(rows);
 });
@@ -206,7 +285,7 @@ app.delete('/api/surat-masuk/:id', requireRole('admin','kasubag','staff'), (req,
 });
 
 // ========== SURAT KELUAR ==========
-app.get('/api/surat-keluar', requireAuth, (req, res) => {
+app.get('/api/surat-keluar', requireRole('admin','kasubag','staff','kepsek'), (req, res) => {
   const rows = db.prepare('SELECT * FROM surat_keluar ORDER BY tanggal DESC').all();
   res.json(rows);
 });
@@ -228,7 +307,7 @@ app.delete('/api/surat-keluar/:id', requireRole('admin','kasubag','staff'), (req
   log(req.user, 'Surat Keluar', `Hapus surat ${row ? row.nomor : ''}`);
   res.json({ ok: true });
 });
-app.get('/api/surat-keluar/:id/pdf', requireAuth, (req, res) => {
+app.get('/api/surat-keluar/:id/pdf', requireRole('admin','kasubag','staff','kepsek'), (req, res) => {
   const s = db.prepare('SELECT * FROM surat_keluar WHERE id=?').get(req.params.id);
   if (!s) return res.status(404).send('Not found');
   const doc = new PDFDocument();
@@ -255,6 +334,10 @@ app.get('/api/surat-keluar/:id/pdf', requireAuth, (req, res) => {
 
 // ========== PEGAWAI ==========
 app.get('/api/pegawai', requireAuth, (req, res) => {
+  if (req.user.role === 'guru') {
+    const rows = db.prepare('SELECT id, nama, jenis_pegawai, status, jabatan FROM pegawai WHERE id=?').all(req.user.pegawai_id || 0);
+    return res.json(rows);
+  }
   const rows = db.prepare('SELECT * FROM pegawai ORDER BY nama').all();
   res.json(rows);
 });
@@ -309,43 +392,65 @@ app.get('/api/pegawai/notifikasi', requireRole('admin','kasubag','kepsek'), (req
 
 // ========== ABSENSI ==========
 app.get('/api/absensi', requireAuth, (req, res) => {
-  const { tanggal } = req.query;
-  const rows = db.prepare(`
-    SELECT p.nama, a.jam, a.status, a.telat_menit, a.keterangan FROM absensi a
-    JOIN pegawai p ON p.id = a.pegawai_id
-    WHERE a.tanggal = ? ORDER BY p.nama
-  `).all(tanggal || new Date().toISOString().slice(0,10));
+  const tanggal = req.query.tanggal || schoolDateTime().date;
+  let rows;
+  if (req.user.role === 'guru') {
+    rows = db.prepare(`
+      SELECT p.nama, a.jam, a.status, a.telat_menit, a.keterangan FROM absensi a
+      JOIN pegawai p ON p.id = a.pegawai_id
+      WHERE a.tanggal = ? AND a.pegawai_id = ? ORDER BY p.nama
+    `).all(tanggal, req.user.pegawai_id || 0);
+  } else {
+    rows = db.prepare(`
+      SELECT p.nama, a.jam, a.status, a.telat_menit, a.keterangan FROM absensi a
+      JOIN pegawai p ON p.id = a.pegawai_id
+      WHERE a.tanggal = ? ORDER BY p.nama
+    `).all(tanggal);
+  }
   res.json(rows);
 });
 app.post('/api/absensi', requireAuth, (req, res) => {
-  const { pegawai_id, tanggal, jam, status, lat, lng, keterangan } = req.body;
-  if ((status === 'Izin' || status === 'Sakit') && (!keterangan || !keterangan.trim())) {
-    return res.status(400).json({ error: 'Keterangan wajib diisi untuk Izin/Sakit' });
-  }
-  if (status === 'Hadir' && (lat == null || lng == null)) {
-    return res.status(400).json({ error: 'Lokasi wajib diaktifkan untuk absen Hadir. Izinkan akses lokasi di browser.' });
-  }
-  if (req.user.role === 'guru' && req.user.pegawai_id !== Number(pegawai_id)) {
-    return res.status(403).json({ error: 'Guru hanya bisa absen untuk diri sendiri' });
-  }
-  let telat = 0;
+  const { pegawai_id, status, lat, lng, keterangan } = req.body;
+  if (!['Hadir', 'Izin', 'Sakit'].includes(status)) return res.status(400).json({ error: 'Status absensi tidak valid' });
+  const pegawaiId = Number(pegawai_id);
+  if (!Number.isInteger(pegawaiId) || pegawaiId <= 0) return res.status(400).json({ error: 'Pegawai tidak valid' });
+  if (!db.prepare('SELECT id FROM pegawai WHERE id=?').get(pegawaiId)) return res.status(404).json({ error: 'Data pegawai tidak ditemukan' });
+  if (req.user.role === 'guru' && req.user.pegawai_id !== pegawaiId) return res.status(403).json({ error: 'Guru hanya bisa absen untuk diri sendiri' });
+
+  const note = typeof keterangan === 'string' ? keterangan.trim() : '';
+  if ((status === 'Izin' || status === 'Sakit') && !note) return res.status(400).json({ error: 'Keterangan wajib diisi untuk Izin/Sakit' });
+  if (note.length > 1000) return res.status(400).json({ error: 'Keterangan maksimal 1000 karakter' });
+
+  let distance = null;
   if (status === 'Hadir') {
-    const [h,m] = jam.split(':').map(Number);
-    const menit = h*60 + m;
-    const batas = 8*60;
-    if (menit > batas) telat = menit - batas;
+    const latitude = Number(lat), longitude = Number(lng);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+      return res.status(400).json({ error: 'Koordinat GPS tidak valid. Aktifkan izin lokasi lalu coba lagi.' });
+    }
+    distance = distanceMeters(latitude, longitude, SCHOOL_LOCATION.lat, SCHOOL_LOCATION.lng);
+    if (distance > ATTENDANCE_RADIUS_METERS) return res.status(403).json({ error: 'Di luar radius resmi sekolah 300 meter (' + Math.round(distance) + ' meter).' });
   }
-  const existing = db.prepare('SELECT id FROM absensi WHERE pegawai_id=? AND tanggal=?').get(pegawai_id, tanggal);
-  if (existing) return res.status(400).json({ error: 'Sudah absen hari ini' });
+
+  const now = schoolDateTime();
+  const [hour, minute] = now.time.split(':').map(Number);
+  const lateMinutes = status === 'Hadir' && hour * 60 + minute > 480 ? hour * 60 + minute - 480 : 0;
+  if (db.prepare('SELECT id FROM absensi WHERE pegawai_id=? AND tanggal=?').get(pegawaiId, now.date)) {
+    return res.status(409).json({ error: 'Pegawai sudah melakukan absensi hari ini' });
+  }
   db.prepare('INSERT INTO absensi (pegawai_id,tanggal,jam,status,telat_menit,lat,lng,keterangan) VALUES (?,?,?,?,?,?,?,?)')
-    .run(pegawai_id,tanggal,jam,status,telat, lat || null, lng || null, keterangan || null);
-  log(req.user, 'Absensi', `Absensi ${status} jam ${jam}${telat ? ' (telat '+telat+' mnt)' : ''}`);
-  res.json({ ok: true, telat });
+    .run(pegawaiId, now.date, now.time, status, lateMinutes, status === 'Hadir' ? Number(lat) : null,
+      status === 'Hadir' ? Number(lng) : null, note || null);
+  log(req.user, 'Absensi', 'Absensi ' + status + ' tanggal ' + now.date + ' jam ' + now.time +
+    (lateMinutes ? ' (telat ' + lateMinutes + ' menit)' : '') +
+    (distance !== null ? ' jarak ' + Math.round(distance) + ' meter' : ''));
+  res.json({ ok: true, tanggal: now.date, jam: now.time, telat: lateMinutes,
+    jarak_meter: distance === null ? null : Math.round(distance) });
 });
 app.get('/api/absensi/rekap', requireRole('admin','kasubag','kepsek','staff'), async (req, res) => {
   const { bulan } = req.query;
   const rows = db.prepare(`
     SELECT p.nama,
+      GROUP_CONCAT(CASE WHEN a.keterangan IS NOT NULL AND TRIM(a.keterangan) <> '' THEN a.tanggal || ': ' || a.keterangan END, ' | ') as keterangan,
       SUM(CASE WHEN a.status='Hadir' THEN 1 ELSE 0 END) as hadir,
       SUM(CASE WHEN a.telat_menit>0 THEN 1 ELSE 0 END) as telat,
       SUM(a.telat_menit) as total_telat,
@@ -360,6 +465,7 @@ app.get('/api/absensi/rekap/excel', requireRole('admin','kasubag','kepsek','staf
   const { bulan } = req.query;
   const rows = db.prepare(`
     SELECT p.nama,
+      GROUP_CONCAT(CASE WHEN a.keterangan IS NOT NULL AND TRIM(a.keterangan) <> '' THEN a.tanggal || ': ' || a.keterangan END, ' | ') as keterangan,
       SUM(CASE WHEN a.status='Hadir' THEN 1 ELSE 0 END) as hadir,
       SUM(CASE WHEN a.telat_menit>0 THEN 1 ELSE 0 END) as telat,
       SUM(a.telat_menit) as total_telat,
@@ -372,6 +478,7 @@ app.get('/api/absensi/rekap/excel', requireRole('admin','kasubag','kepsek','staf
   const ws = wb.addWorksheet('Rekap');
   ws.columns = [
     { header: 'Nama', key: 'nama' },
+    { header: 'Keterangan Absensi', key: 'keterangan' },
     { header: 'Hadir', key: 'hadir' },
     { header: 'Telat', key: 'telat' },
     { header: 'Total Menit Telat', key: 'total_telat' },
@@ -448,29 +555,54 @@ app.get('/api/users', requireRole('admin','kasubag'), (req, res) => {
 });
 app.post('/api/users', requireRole('admin','kasubag'), (req, res) => {
   const { username, password, nama, role, pegawai_id } = req.body;
-  if (!username || !password || password.length < 6) return res.status(400).json({ error: 'Username & password (min 6) wajib diisi' });
+  const assignedRole = role || 'guru';
+  const allowedRoles = req.user.role === 'admin'
+    ? ['admin', 'kepsek', 'kasubag', 'staff', 'guru']
+    : ['staff', 'guru'];
+  if (typeof username !== 'string' || !/^[a-zA-Z0-9._-]{3,50}$/.test(username) ||
+      typeof password !== 'string' || password.length < 12 || password.length > 200) {
+    return res.status(400).json({ error: 'Username harus 3-50 karakter dan password minimal 12 karakter' });
+  }
+  if (!allowedRoles.includes(assignedRole)) return res.status(403).json({ error: 'Role tersebut tidak boleh dibuat oleh akun ini' });
+  const pegawaiId = pegawai_id ? Number(pegawai_id) : null;
+  if (pegawaiId !== null && (!Number.isInteger(pegawaiId) || !db.prepare('SELECT id FROM pegawai WHERE id=?').get(pegawaiId))) {
+    return res.status(400).json({ error: 'Pegawai yang dipilih tidak valid' });
+  }
+  if (assignedRole === 'guru' && !pegawaiId) return res.status(400).json({ error: 'Akun guru harus terhubung ke data pegawai' });
   const exists = db.prepare('SELECT id FROM users WHERE username=?').get(username);
   if (exists) return res.status(400).json({ error: 'Username sudah dipakai' });
   db.prepare('INSERT INTO users (username,password_hash,nama,role,pegawai_id) VALUES (?,?,?,?,?)')
-    .run(username, hashPass(password), nama || username, role || 'guru', pegawai_id || null);
-  log(req.user, 'User', `Buat akun ${username} (${role})`);
+    .run(username, hashPass(password), nama || username, assignedRole, pegawaiId);
+  log(req.user, 'User', 'Buat akun ' + username + ' (' + assignedRole + ')');
   res.json({ ok: true });
 });
 app.put('/api/users/:id/reset-password', requireRole('admin','kasubag'), (req, res) => {
   const { password } = req.body;
-  if (!password || password.length < 6) return res.status(400).json({ error: 'Password minimal 6 karakter' });
-  db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hashPass(password), req.params.id);
-  log(req.user, 'User', `Reset password user id ${req.params.id}`);
+  if (typeof password !== 'string' || password.length < 12 || password.length > 200) return res.status(400).json({ error: 'Password minimal 12 karakter' });
+  const target = db.prepare('SELECT id, role FROM users WHERE id=?').get(req.params.id);
+  if (!target) return res.status(404).json({ error: 'Akun tidak ditemukan' });
+  if (req.user.role === 'kasubag' && ['admin', 'kepsek', 'kasubag'].includes(target.role)) {
+    return res.status(403).json({ error: 'Kasubag hanya dapat reset akun guru dan staff' });
+  }
+  db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hashPass(password), target.id);
+  db.prepare('DELETE FROM sessions WHERE user_id=?').run(target.id);
+  log(req.user, 'User', 'Reset password user id ' + target.id);
   res.json({ ok: true });
 });
 app.delete('/api/users/:id', requireRole('admin','kasubag'), (req, res) => {
-  if (Number(req.params.id) === req.user.id) return res.status(400).json({ error: 'Tidak bisa hapus akun sendiri' });
-  db.prepare('DELETE FROM sessions WHERE user_id=?').run(req.params.id);
-  db.prepare('DELETE FROM users WHERE id=?').run(req.params.id);
-  log(req.user, 'User', `Hapus akun id ${req.params.id}`);
+  const targetId = Number(req.params.id);
+  if (!Number.isInteger(targetId) || targetId <= 0) return res.status(400).json({ error: 'ID akun tidak valid' });
+  if (targetId === req.user.id) return res.status(400).json({ error: 'Tidak bisa hapus akun sendiri' });
+  const target = db.prepare('SELECT id, role FROM users WHERE id=?').get(targetId);
+  if (!target) return res.status(404).json({ error: 'Akun tidak ditemukan' });
+  if (req.user.role === 'kasubag' && ['admin', 'kepsek', 'kasubag'].includes(target.role)) {
+    return res.status(403).json({ error: 'Kasubag hanya dapat menghapus akun guru dan staff' });
+  }
+  db.prepare('DELETE FROM sessions WHERE user_id=?').run(targetId);
+  db.prepare('DELETE FROM users WHERE id=?').run(targetId);
+  log(req.user, 'User', 'Hapus akun id ' + targetId);
   res.json({ ok: true });
 });
-
 // ========== LAPORAN BULANAN ==========
 const DIVISI = ["Administrasi Kesiswaan","Administrasi Keuangan","Administrasi Kurikulum","Dapodik","HUMAS","Keamanan dan Kebersihan","Kepegawaian","Persuratan dan Kearsipan","SARPRAS"];
 app.get('/api/divisi', requireAuth, (req, res) => res.json(DIVISI));
@@ -524,6 +656,10 @@ app.get('/api/laporan/rekap', requireRole('admin','kasubag','kepsek','staff'), (
 // ========== IMPORT PEGAWAI (Excel/CSV) ==========
 app.post('/api/pegawai/import', requireRole('admin','kasubag'), upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'File tidak ada' });
+  if (path.extname(req.file.originalname || '').toLowerCase() !== '.xlsx') {
+    fs.promises.unlink(req.file.path).catch(() => {});
+    return res.status(400).json({ error: 'Import hanya mendukung file Excel .xlsx' });
+  }
   try {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.readFile(req.file.path);
@@ -567,7 +703,9 @@ app.post('/api/pegawai/import', requireRole('admin','kasubag'), upload.single('f
     log(req.user, 'Import Pegawai', `Import ${ok} pegawai dari Excel (${gagal} gagal)`);
     res.json({ ok: true, berhasil: ok, gagal });
   } catch(e) {
-    return res.status(400).json({ error: 'Gagal baca file: ' + e.message });
+    if (req.file && fs.existsSync(req.file.path)) fs.promises.unlink(req.file.path).catch(() => {});
+    console.error('Import pegawai gagal:', e.message);
+    return res.status(400).json({ error: 'Gagal membaca atau memproses file Excel.' });
   }
 });
 
@@ -578,24 +716,49 @@ app.get('/api/log', requireRole('admin','kasubag','kepsek'), (req, res) => {
 });
 
 // ========== BACKUP ==========
-app.get('/api/backup', requireRole('admin','kasubag'), (req, res) => {
-  const stamp = new Date().toISOString().slice(0,10);
-  const dest = path.join(__dirname, `backup-${stamp}.db`);
-  fs.copyFileSync(dbPath, dest);
-  log(req.user, 'Backup', `Download backup database ${stamp}`);
-  res.download(dest, `backup-smkn2-${stamp}.db`);
+app.get('/api/backup', requireRole('admin','kasubag'), async (req, res, next) => {
+  const stamp = schoolDateTime().date;
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'situ-smkn2-backup-'));
+  const databaseCopy = path.join(tempDir, 'data.db');
+  const cleanup = () => fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+  try {
+    await db.backup(databaseCopy);
+    log(req.user, 'Backup', `Download backup database dan unggahan ${stamp}`);
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename=backup-smkn2-${stamp}.zip`);
+    res.on('finish', cleanup);
+    res.on('close', cleanup);
+    const archive = archiver('zip', { zlib: { level: 6 } });
+    archive.on('error', err => {
+      cleanup();
+      if (!res.headersSent) next(err);
+      else res.destroy(err);
+    });
+    archive.pipe(res);
+    archive.file(databaseCopy, { name: 'data.db' });
+    if (fs.existsSync(uploadsDir)) archive.directory(uploadsDir, 'uploads');
+    archive.finalize();
+  } catch (err) {
+    await cleanup();
+    next(err);
+  }
 });
 
-// Seed pegawai if empty
-const count = db.prepare('SELECT COUNT(*) as c FROM pegawai').get();
-if (count.c === 0) {
-  const seed = db.prepare('INSERT INTO pegawai (nama,nip,golongan,jabatan,status,masa_jabatan) VALUES (?,?,?,?,?,?)');
-  seed.run('Budi Santoso, S.Pd', '198501012010011001', 'III/a', 'Guru Matematika', 'PNS', '2010-2027');
-  seed.run('Siti Rahayu, M.Pd', '198702142012012002', 'III/b', 'Guru Bahasa Indonesia', 'PNS', '2012-2028');
-  seed.run('Ahmad Yani, S.Pd', '199003152015011003', 'III/a', 'Guru IPS', 'PNS', '2015-2029');
-  seed.run('Dewi Lestari, S.Pd', '199104202016012004', 'III/a', 'Kasubag TU', 'PNS', '2016-2030');
-  seed.run('Rudi Hermawan, S.Pd', '199205252017011005', 'II/c', 'Guru PJOK', 'PPPK', '2017-2029');
-  seed.run('Fitri Handayani, S.Pd', '199306302018012006', 'II/c', 'Staff TU', 'PPPK', '2018-2030');
-}
+// Demo personnel are intentionally not inserted into operational databases.
 
+app.get('/healthz', (req, res) => {
+  try {
+    db.prepare('SELECT 1').get();
+    res.json({ ok: true, service: 'situ-smkn2' });
+  } catch (err) {
+    res.status(503).json({ ok: false });
+  }
+});
+app.use((err, req, res, next) => {
+  console.error(err && err.message ? err.message : 'Request error');
+  if (res.headersSent) return next(err);
+  if (err && err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'Ukuran file maksimal 10 MB' });
+  if (err && err.message === 'Jenis file tidak diizinkan') return res.status(400).json({ error: err.message });
+  res.status(400).json({ error: 'Permintaan tidak dapat diproses' });
+});
 app.listen(PORT, () => console.log(`SMKN 2 Rantau TU running on :${PORT}`));

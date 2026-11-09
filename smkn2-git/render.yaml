@@ -2,8 +2,13 @@ services:
   - type: web
     name: smkn2-rantau-tu
     runtime: node
-    buildCommand: npm install
+    rootDir: smkn2-git
+    buildCommand: npm ci
     startCommand: npm start
     envVars:
       - key: NODE_VERSION
         value: 20.0.0
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY_HOPS
+        value: 1
