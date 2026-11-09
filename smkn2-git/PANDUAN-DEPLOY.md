@@ -20,6 +20,7 @@ Aplikasi ini memproses data pegawai dan administrasi sekolah. Jangan deploy ke l
 
 - NODE_ENV=production
 - PORT disediakan oleh platform hosting.
+- TRUST_PROXY_HOPS diatur hanya jika aplikasi berada di belakang reverse proxy tepercaya; isi 1 untuk satu proxy tepercaya, atau biarkan 0/tidak diatur jika akses langsung.
 - DATA_DIR menunjuk ke mount point penyimpanan persisten.
 - BOOTSTRAP_ADMIN_USERNAME dan BOOTSTRAP_ADMIN_PASSWORD hanya digunakan saat database benar-benar kosong untuk membuat admin pertama. Password minimal 12 karakter. Setelah akun dibuat, hapus kedua variable bootstrap dari konfigurasi layanan.
 
