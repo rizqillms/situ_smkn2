@@ -236,7 +236,7 @@
         <input type="month" id="bulan" style="width:180px;" onchange="loadRekap()">
         <button class="btn" onclick="exportExcel()">Export Excel</button>
       </div>
-      <table><tr><th>Nama</th><th>Hadir</th><th>Telat</th><th>Total Menit Telat</th><th>Izin</th><th>Sakit</th></tr><tbody id="list-rekap"></tbody></table>
+      <table><tr><th>Nama</th><th>Hadir</th><th>Telat</th><th>Total Menit Telat</th><th>Izin</th><th>Sakit</th><th>Keterangan</th></tr><tbody id="list-rekap"></tbody></table>
     </div>
   </div>
 
@@ -477,7 +477,7 @@ async function loadRekapPegawai(){
 }
 function exportSuratExcel(){ const b=document.getElementById('bulan-surat').value||document.getElementById('bulan').value; window.open('/api/rekap/surat/excel?bulan='+b+'&token='+token); }
 function exportPegawaiExcel(){ window.open('/api/rekap/pegawai/excel?token='+token); }
-async function loadRekap(){ const b=document.getElementById('bulan').value; const rows=await api('/api/absensi/rekap?bulan='+b).then(r=>r.json()); document.getElementById('list-rekap').innerHTML=rows.map(r=>`<tr><td>${r.nama}</td><td>${r.hadir||0}</td><td>${r.telat||0}</td><td>${r.total_telat||0} mnt</td><td>${r.izin||0}</td><td>${r.sakit||0}</td></tr>`).join(''); }
+async async function loadRekap(){ const b=document.getElementById('bulan').value; const response=await api('/api/absensi/rekap?bulan='+encodeURIComponent(b)); const rows=await response.json(); document.getElementById('list-rekap').innerHTML=rows.map(r=>`<tr><td>${esc(r.nama)}</td><td>${r.hadir||0}</td><td>${r.telat||0}</td><td>${r.total_telat||0} mnt</td><td>${r.izin||0}</td><td>${r.sakit||0}</td><td>${esc(r.keterangan||'-')}</td></tr>`).join(''); }
 async function doAbsen(id,status){
   let keterangan = '';
   if (status === 'Izin' || status === 'Sakit') {
