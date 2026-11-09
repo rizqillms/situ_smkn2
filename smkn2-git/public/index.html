@@ -80,6 +80,23 @@ table{display:block;width:100%;overflow-x:auto;border-collapse:separate;border-s
 @media(max-width:390px){.stat-grid{grid-template-columns:1fr 1fr}.stat-card{align-items:flex-start;flex-direction:column}.topbar h1{font-size:1rem}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
 
+
+/* Premium dashboard redesign */
+.dashboard-page{display:flex;flex-direction:column;gap:26px}
+.dashboard-hero{position:relative;isolation:isolate;overflow:hidden;display:flex;align-items:center;justify-content:space-between;min-height:220px;padding:clamp(24px,4vw,42px);border-radius:22px;color:#fff;background:linear-gradient(112deg,#102542 0%,#173d70 58%,#1769a8 100%);box-shadow:0 16px 38px rgba(17,49,87,.16)}
+.hero-copy{position:relative;z-index:2;max-width:680px}.hero-eyebrow{display:flex;align-items:center;gap:9px;font-size:.68rem;font-weight:800;letter-spacing:.14em;color:#b9d8f5}.hero-eyebrow-dot{width:7px;height:7px;border-radius:50%;background:#6ee7c0;box-shadow:0 0 0 5px rgba(110,231,192,.12)}
+.dashboard-hero h2{margin:17px 0 7px;color:#fff;font-size:clamp(1.65rem,3vw,2.35rem);font-weight:800;letter-spacing:-.045em;line-height:1.15}.dashboard-hero p{max-width:520px;color:rgba(239,247,255,.78);font-size:.91rem}.hero-meta{display:inline-flex;align-items:center;gap:8px;margin-top:21px;padding:8px 12px;border:1px solid rgba(255,255,255,.18);border-radius:9px;background:rgba(255,255,255,.08);font-size:.76rem;color:#e6f2ff}.hero-meta-icon{font-size:1rem}
+.hero-mark{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;width:142px;height:142px;margin-right:5%;border:1px solid rgba(255,255,255,.2);border-radius:50%;background:rgba(255,255,255,.07);box-shadow:inset 0 0 0 9px rgba(255,255,255,.025);color:#d7eaff;letter-spacing:.22em;font-size:.62rem}.hero-mark strong{font-size:3.4rem;line-height:1.05;letter-spacing:-.08em;color:#fff}.hero-mark i{font-style:normal;font-size:.56rem;letter-spacing:.32em}.hero-orb{position:absolute;z-index:-1;border:1px solid rgba(255,255,255,.09);border-radius:50%}.hero-orb-one{width:340px;height:340px;right:5%;top:-190px}.hero-orb-two{width:470px;height:470px;right:-4%;bottom:-360px}
+.dash-section{display:flex;flex-direction:column;gap:14px}.dash-section-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}.dash-section-heading h2,.dash-panel-heading h2{margin:3px 0 0;color:#182b45;font-size:1.12rem;letter-spacing:-.025em}.dash-section-heading p{margin-top:4px;color:#78869a;font-size:.82rem}.dash-kicker{font-size:.62rem;font-weight:800;letter-spacing:.13em;color:#7b8ba3}.dash-live{display:inline-flex;align-items:center;gap:7px;color:#718096;font-size:.72rem;font-weight:700}.dash-live span{width:7px;height:7px;border-radius:50%;background:#16a085}
+.dash-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.dash-stat-card{min-width:0;padding:19px 20px;border:1px solid #e5eaf1;border-radius:16px;background:#fff;box-shadow:0 4px 16px rgba(18,42,74,.035);transition:transform .18s ease,box-shadow .18s ease}.dash-stat-card:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(18,42,74,.075)}.dash-stat-top{display:flex;align-items:center;justify-content:space-between;gap:8px}.dash-stat-icon,.quick-icon{display:grid;place-items:center;flex:0 0 auto;width:39px;height:39px;border-radius:12px;font-size:1.2rem;font-weight:700}.icon-blue,.quick-blue{background:#eaf1ff;color:#3166c9}.icon-teal,.quick-teal{background:#e7f7f4;color:#168b7a}.icon-amber,.quick-amber{background:#fff4df;color:#b7791f}.icon-green{background:#e8f7ef;color:#218653}.quick-violet{background:#f1edff;color:#7657c8}.quick-slate{background:#edf1f6;color:#53657e}.dash-stat-label{font-size:.68rem;font-weight:700;color:#94a0b1}.dash-stat-value{margin-top:16px;color:#172b46;font-size:2rem;font-weight:800;letter-spacing:-.055em;line-height:1.1}.dash-stat-caption{margin-top:5px;color:#738198;font-size:.78rem}
+.dash-main-grid{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:16px}.dash-panel{min-width:0;padding:22px;border:1px solid #e5eaf1;border-radius:17px;background:#fff;box-shadow:0 4px 16px rgba(18,42,74,.035)}.dash-panel-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.dash-panel-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:11px;background:#f0f4fa;color:#46617f;font-size:1.1rem}.attendance-summary{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin:25px 0 13px}.attendance-summary>div{display:flex;flex-direction:column;gap:3px}.attendance-summary strong{color:#1d3b62;font-size:2.45rem;line-height:1;font-weight:800;letter-spacing:-.06em}.attendance-summary span{color:#8491a3;font-size:.75rem}.attendance-summary-note{max-width:48%;text-align:right;color:#6d7e93!important;font-size:.75rem!important}.attendance-track{height:9px;overflow:hidden;border-radius:99px;background:#edf1f6}.attendance-track span{display:block;width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,#1a9b82,#4bc3a5);transition:width .35s ease}.attendance-legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:15px;color:#7b8798;font-size:.68rem}.attendance-legend span{display:inline-flex;align-items:center;gap:6px}.legend-dot{width:7px;height:7px;border-radius:50%}.legend-present{background:#1a9b82}.legend-late{background:#e2a33b}.legend-other{background:#cbd3df}.dash-text-link{display:inline-flex;align-items:center;gap:8px;margin-top:23px;padding:0;border:0;background:none;color:#2259a8;font-size:.78rem;font-weight:800;cursor:pointer}.dash-text-link:hover{color:#123d7a}
+.executive-metrics{display:grid;grid-template-columns:1fr 1fr;gap:0 18px;margin-top:19px}.executive-metrics>div{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 0;border-bottom:1px solid #edf1f6}.executive-metrics>div:nth-last-child(-n+2){border-bottom:0}.executive-metrics span{color:#78869a;font-size:.74rem}.executive-metrics strong{color:#1c3658;font-size:1.1rem;font-weight:800}.dash-panel-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:17px}.dash-panel-actions .btn{font-size:.75rem}
+.dash-quick-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}.dash-quick-card{display:flex;align-items:center;gap:13px;min-width:0;padding:15px 16px;border:1px solid #e5eaf1;border-radius:14px;background:#fff;text-align:left;cursor:pointer;transition:border-color .18s ease,transform .18s ease,box-shadow .18s ease}.dash-quick-card:hover{transform:translateY(-2px);border-color:#c7d7ef;box-shadow:0 8px 20px rgba(18,42,74,.06)}.dash-quick-card>span:nth-child(2){display:flex;flex:1;min-width:0;flex-direction:column;gap:3px}.dash-quick-card strong{color:#243a58;font-size:.81rem}.dash-quick-card small{overflow:hidden;color:#8290a2;font-size:.69rem;text-overflow:ellipsis;white-space:nowrap}.dash-quick-card>b{color:#9aa8b9;font-size:1.1rem}.dashboard-notifications:empty{display:none}.dashboard-notifications .notif-box{margin:0}
+#dash-kepsek{background:linear-gradient(145deg,#fff 0%,#f8fbff 100%);border-color:#dfe8f5}
+@media(max-width:900px){.dash-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.dash-main-grid{grid-template-columns:1fr}.hero-mark{width:118px;height:118px;margin-right:1%}.hero-mark strong{font-size:2.8rem}}
+@media(max-width:600px){.dashboard-page{gap:21px}.dashboard-hero{min-height:190px;padding:22px 20px;border-radius:17px}.hero-mark{width:76px;height:76px;margin:0 0 0 8px;font-size:.48rem}.hero-mark strong{font-size:2rem}.hero-mark i{font-size:.42rem}.dashboard-hero h2{font-size:1.55rem}.dashboard-hero p{max-width:330px;font-size:.8rem}.hero-eyebrow{font-size:.56rem}.hero-meta{margin-top:15px;font-size:.68rem}.dash-stat-grid{gap:9px}.dash-stat-card{padding:14px 13px;border-radius:13px}.dash-stat-icon{width:34px;height:34px;border-radius:10px}.dash-stat-value{margin-top:12px;font-size:1.7rem}.dash-stat-caption{font-size:.7rem}.dash-section-heading h2,.dash-panel-heading h2{font-size:1rem}.dash-panel{padding:17px;border-radius:15px}.attendance-summary strong{font-size:2.1rem}.attendance-legend{gap:9px;font-size:.62rem}.dash-quick-grid{grid-template-columns:1fr}.dash-quick-card{padding:13px}.executive-metrics{gap:0 12px}.executive-metrics span{font-size:.68rem}.executive-metrics strong{font-size:1rem}}
+@media(max-width:360px){.hero-mark{display:none}.dash-stat-card{padding:12px 10px}.dash-stat-label{font-size:.62rem}}
+
 </style>
 </head>
 <body>
@@ -112,39 +129,92 @@ table{display:block;width:100%;overflow-x:auto;border-collapse:separate;border-s
 <div class="container">
 
 <!-- DASHBOARD -->
-<div id="dashboard">
-  <div id="notif-wrap"></div>
-  <div class="stat-grid">
-    <div class="stat-card"><div class="stat-icon blue">📥</div><div class="stat-info"><b id="stat-sm">0</b><span>Surat Masuk</span></div></div>
-    <div class="stat-card"><div class="stat-icon green">📤</div><div class="stat-info"><b id="stat-sk">0</b><span>Surat Keluar</span></div></div>
-    <div class="stat-card"><div class="stat-icon amber">⏰</div><div class="stat-info"><b id="stat-telat">0</b><span>Telat Hari Ini</span></div></div>
-    <div class="stat-card"><div class="stat-icon rose">📋</div><div class="stat-info"><b id="stat-hadir">0</b><span>Hadir Hari Ini</span></div></div>
-  </div>
-  <div class="card" id="dash-kepsek" style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid #bae6fd;">
-    <h2>🏫 Ringkasan buat Kepala Sekolah</h2>
-    <p class="sub">Gambaran sekolah hari ini — tanpa perlu buka menu lain.</p>
-    <div class="stat-grid" style="margin-bottom:12px;">
-      <div class="stat-card"><div class="stat-icon blue">👥</div><div class="stat-info"><b id="kp-guru">0</b><span>Total Guru & Staff</span></div></div>
-      <div class="stat-card"><div class="stat-icon green">✅</div><div class="stat-info"><b id="kp-hadir">0</b><span>Hadir Hari Ini</span></div></div>
-      <div class="stat-card"><div class="stat-icon amber">⏰</div><div class="stat-info"><b id="kp-telat">0</b><span>Telat Hari Ini</span></div></div>
-      <div class="stat-card"><div class="stat-icon rose">📈</div><div class="stat-info"><b id="kp-persen">0%</b><span>Kehadiran</span></div></div>
+<div id="dashboard" class="dashboard-page">
+  <section class="dashboard-hero">
+    <div class="hero-copy">
+      <div class="hero-eyebrow"><span class="hero-eyebrow-dot"></span> SISTEM INFORMASI TATA USAHA</div>
+      <h2 id="dash-greeting">Selamat datang kembali</h2>
+      <p>Semua informasi administrasi sekolah, tersaji ringkas dalam satu tempat.</p>
+      <div class="hero-meta"><span class="hero-meta-icon">◷</span><span id="dash-date">Memuat tanggal...</span></div>
     </div>
-    <div id="kp-notif"></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
-      <button class="btn btn-secondary" onclick="show('rekap')">Lihat Rekap</button>
-      <button class="btn btn-secondary" onclick="show('pegawai')">Data Pegawai</button>
+    <div class="hero-mark" aria-hidden="true"><span>SMK</span><strong>02</strong><i>RANTAU</i></div>
+    <div class="hero-orb hero-orb-one" aria-hidden="true"></div>
+    <div class="hero-orb hero-orb-two" aria-hidden="true"></div>
+  </section>
+
+  <div id="notif-wrap" class="dashboard-notifications"></div>
+
+  <section class="dash-section">
+    <div class="dash-section-heading">
+      <div><span class="dash-kicker">OVERVIEW</span><h2>Ringkasan aktivitas</h2></div>
+      <span class="dash-live"><span></span> Data aplikasi</span>
     </div>
-  </div>
-  <div class="card">
-    <h2>Aksi Cepat</h2>
-    <p class="sub">Pilih yang mau kamu lakuin</p>
-    <div style="display:flex; gap:8px; flex-wrap:wrap;">
-      <button class="btn" onclick="show('surat-masuk')">+ Surat Masuk</button>
-      <button class="btn btn-secondary" onclick="show('surat-keluar')">+ Surat Keluar</button>
-      <button class="btn btn-secondary" onclick="show('absensi')">✅ Absensi</button>
-      <button class="btn btn-secondary" onclick="show('pegawai')">👥 Data Pegawai</button>
+    <div class="dash-stat-grid">
+      <article class="dash-stat-card" data-school-only>
+        <div class="dash-stat-top"><span class="dash-stat-icon icon-blue" aria-hidden="true">↙</span><span class="dash-stat-label">Administrasi</span></div>
+        <div class="dash-stat-value" id="stat-sm">0</div><div class="dash-stat-caption">Surat masuk</div>
+      </article>
+      <article class="dash-stat-card" data-school-only>
+        <div class="dash-stat-top"><span class="dash-stat-icon icon-teal" aria-hidden="true">↗</span><span class="dash-stat-label">Administrasi</span></div>
+        <div class="dash-stat-value" id="stat-sk">0</div><div class="dash-stat-caption">Surat keluar</div>
+      </article>
+      <article class="dash-stat-card">
+        <div class="dash-stat-top"><span class="dash-stat-icon icon-amber" aria-hidden="true">◷</span><span class="dash-stat-label">Kehadiran</span></div>
+        <div class="dash-stat-value" id="stat-telat">0</div><div class="dash-stat-caption">Terlambat hari ini</div>
+      </article>
+      <article class="dash-stat-card">
+        <div class="dash-stat-top"><span class="dash-stat-icon icon-green" aria-hidden="true">✓</span><span class="dash-stat-label">Kehadiran</span></div>
+        <div class="dash-stat-value" id="stat-hadir">0</div><div class="dash-stat-caption">Hadir hari ini</div>
+      </article>
     </div>
+  </section>
+
+  <div class="dash-main-grid">
+    <section class="dash-panel dash-attendance-panel" id="dash-attendance-panel">
+      <div class="dash-panel-heading">
+        <div><span class="dash-kicker">KEHADIRAN HARI INI</span><h2>Ikhtisar kehadiran</h2></div>
+        <span class="dash-panel-icon">▥</span>
+      </div>
+      <div class="attendance-summary">
+        <div><strong id="dash-attendance-label">0%</strong><span>Tingkat kehadiran</span></div>
+        <span class="attendance-summary-note" id="dash-attendance-detail">Memuat ringkasan...</span>
+      </div>
+      <div class="attendance-track" role="progressbar" aria-label="Persentase kehadiran" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="dash-attendance-track"><span id="dash-attendance-progress"></span></div>
+      <div class="attendance-legend"><span><i class="legend-dot legend-present"></i>Hadir</span><span><i class="legend-dot legend-late"></i>Terlambat</span><span><i class="legend-dot legend-other"></i>Belum hadir / lainnya</span></div>
+      <button class="dash-text-link" type="button" onclick="show('rekap')">Buka rekap kehadiran <span aria-hidden="true">→</span></button>
+    </section>
+
+    <section class="dash-panel dash-executive-panel" id="dash-kepsek">
+      <div class="dash-panel-heading">
+        <div><span class="dash-kicker">RINGKASAN SEKOLAH</span><h2>Gambaran hari ini</h2></div>
+        <span class="dash-panel-icon">⌂</span>
+      </div>
+      <div class="executive-metrics">
+        <div><span>Total guru & staf</span><strong id="kp-guru">0</strong></div>
+        <div><span>Hadir hari ini</span><strong id="kp-hadir">0</strong></div>
+        <div><span>Terlambat</span><strong id="kp-telat">0</strong></div>
+        <div><span>Persentase hadir</span><strong id="kp-persen">0%</strong></div>
+      </div>
+      <div id="kp-notif"></div>
+      <div class="dash-panel-actions">
+        <button class="btn btn-secondary" onclick="show('rekap')">Lihat rekap</button>
+        <button class="btn btn-secondary" onclick="show('pegawai')">Data pegawai</button>
+      </div>
+    </section>
   </div>
+
+  <section class="dash-section dash-quick-section">
+    <div class="dash-section-heading">
+      <div><span class="dash-kicker">SHORTCUT</span><h2>Akses cepat</h2><p>Langsung menuju pekerjaan yang sering digunakan.</p></div>
+    </div>
+    <div class="dash-quick-grid">
+      <button class="dash-quick-card" type="button" onclick="show('surat-masuk')" data-school-only><span class="quick-icon quick-blue">↙</span><span><strong>Surat masuk</strong><small>Catat dan kelola surat diterima</small></span><b aria-hidden="true">→</b></button>
+      <button class="dash-quick-card" type="button" onclick="show('surat-keluar')" data-school-only><span class="quick-icon quick-teal">↗</span><span><strong>Surat keluar</strong><small>Buat surat dan dokumen resmi</small></span><b aria-hidden="true">→</b></button>
+      <button class="dash-quick-card" type="button" onclick="show('absensi')"><span class="quick-icon quick-amber">✓</span><span><strong>Absensi</strong><small>Lihat dan kelola kehadiran</small></span><b aria-hidden="true">→</b></button>
+      <button class="dash-quick-card" type="button" onclick="show('pegawai')" data-school-only><span class="quick-icon quick-violet">♙</span><span><strong>Kepegawaian</strong><small>Kelola informasi pegawai</small></span><b aria-hidden="true">→</b></button>
+      <button class="dash-quick-card" type="button" onclick="show('laporan')"><span class="quick-icon quick-slate">▤</span><span><strong>Laporan bulanan</strong><small>Lihat dan kirim laporan kegiatan</small></span><b aria-hidden="true">→</b></button>
+    </div>
+  </section>
 </div>
 
 <!-- SURAT MASUK -->
@@ -469,30 +539,68 @@ function updateNomor(){ const j=document.getElementById('jenis-surat').value; do
 updateNomor();
 
 async function loadStats(){
-  const [sm, sk, pg, ab] = await Promise.all([
-    api('/api/surat-masuk').then(r=>r.json()),
-    api('/api/surat-keluar').then(r=>r.json()),
-    api('/api/pegawai').then(r=>r.json()),
-    api('/api/absensi').then(r=>r.json())
-  ]);
-  document.getElementById('stat-sm').textContent = sm.length;
-  document.getElementById('stat-sk').textContent = sk.length;
-  document.getElementById('stat-hadir').textContent = ab.filter(a=>a.status==='Hadir').length;
-  document.getElementById('stat-telat').textContent = ab.filter(a=>a.telat_menit>0).length;
-  const notif = await api('/api/pegawai/notifikasi').then(r=>r.json());
-  if (notif.length) {
-    const html = `<div class="notif-box"><b>🔔 Notifikasi Kenaikan Pangkat:</b><br>${notif.map(n=>`• ${esc(n.nama)} — ${esc(n.tanggal_naik_pangkat)}`).join('<br>')}</div>`;
-    document.getElementById('notif-wrap').innerHTML = html;
-    const kn = document.getElementById('kp-notif');
-    if (kn) kn.innerHTML = html;
-  }
-  const hadir = ab.filter(a=>a.status==='Hadir').length;
-  const total = pg.length || 1;
+  const isGuru = role === 'guru';
+  const canManageNotifications = ['admin','kasubag'].includes(role);
+  const fetchList = async (path) => {
+    try {
+      const response = await api(path);
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data : [];
+    } catch { return []; }
+  };
+  const requests = isGuru
+    ? [Promise.resolve([]), Promise.resolve([]), fetchList('/api/pegawai'), fetchList('/api/absensi')]
+    : [fetchList('/api/surat-masuk'), fetchList('/api/surat-keluar'), fetchList('/api/pegawai'), fetchList('/api/absensi')];
+  const [sm, sk, pg, ab] = await Promise.all(requests);
   const set = (id, value) => { const el=document.getElementById(id); if(el) el.textContent=value; };
-  set('kp-guru', pg.length);
+  set('stat-sm', isGuru ? '—' : sm.length);
+  set('stat-sk', isGuru ? '—' : sk.length);
+  set('stat-hadir', ab.filter(a=>a.status==='Hadir').length);
+  set('stat-telat', ab.filter(a=>Number(a.telat_menit)>0).length);
+
+  const schoolOnly = document.querySelectorAll('[data-school-only]');
+  schoolOnly.forEach(el => { el.style.display = isGuru ? 'none' : ''; });
+  const executive = document.getElementById('dash-kepsek');
+  if (executive) executive.style.display = isGuru ? 'none' : '';
+
+  const hadir = ab.filter(a=>a.status==='Hadir').length;
+  const telat = ab.filter(a=>Number(a.telat_menit)>0).length;
+  const total = pg.length;
+  const percentage = total ? Math.min(100, Math.round(hadir/total*100)) : 0;
+  set('kp-guru', total);
   set('kp-hadir', hadir);
-  set('kp-telat', ab.filter(a=>a.telat_menit>0).length);
-  set('kp-persen', Math.round(hadir/total*100)+'%');
+  set('kp-telat', telat);
+  set('kp-persen', percentage+'%');
+  set('dash-attendance-label', percentage+'%');
+  set('dash-attendance-detail', total ? hadir+' dari '+total+' pegawai tercatat hadir' : 'Belum ada data pegawai');
+  const progress = document.getElementById('dash-attendance-progress');
+  const track = document.getElementById('dash-attendance-track');
+  if(progress) progress.style.width = percentage+'%';
+  if(track) track.setAttribute('aria-valuenow', String(percentage));
+
+  const greeting = document.getElementById('dash-greeting');
+  if(greeting) {
+    const hour = new Date().getHours();
+    const salutation = hour < 11 ? 'Selamat pagi' : hour < 15 ? 'Selamat siang' : hour < 18 ? 'Selamat sore' : 'Selamat malam';
+    greeting.textContent = salutation+', '+(currentUser.nama || 'Pengguna')+'!';
+  }
+  const dashDate = document.getElementById('dash-date');
+  if(dashDate) dashDate.textContent = new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+  const notifWrap = document.getElementById('notif-wrap');
+  const kpNotif = document.getElementById('kp-notif');
+  if (canManageNotifications) {
+    const notif = await fetchList('/api/pegawai/notifikasi');
+    const notificationHtml = notif.length
+      ? '<div class="notif-box"><b>Pengingat kenaikan pangkat</b><br>'+notif.map(n=>'• '+esc(n.nama)+' — '+esc(n.tanggal_naik_pangkat)).join('<br>')+'</div>'
+      : '';
+    if(notifWrap) notifWrap.innerHTML = notificationHtml;
+    if(kpNotif) kpNotif.innerHTML = notificationHtml;
+  } else {
+    if(notifWrap) notifWrap.innerHTML = '';
+    if(kpNotif) kpNotif.innerHTML = '';
+  }
 }
 async function loadSM(){
   const rows = await api('/api/surat-masuk').then(r=>r.json());
