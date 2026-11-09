@@ -7,6 +7,8 @@ const multer = require('multer');
 const PDFDocument = require('pdfkit');
 const ExcelJS = require('exceljs');
 const crypto = require('crypto');
+const os = require('os');
+const archiver = require('archiver');
 const bcrypt = require('bcryptjs');
 
 const app = express();
@@ -691,15 +693,30 @@ app.get('/api/log', requireRole('admin','kasubag','kepsek'), (req, res) => {
 // ========== BACKUP ==========
 app.get('/api/backup', requireRole('admin','kasubag'), async (req, res, next) => {
   const stamp = schoolDateTime().date;
-  const dest = path.join(dataDir, `backup-${stamp}-${Date.now()}.db`);
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'situ-smkn2-backup-'));
+  const databaseCopy = path.join(tempDir, 'data.db');
+  const cleanup = () => fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
   try {
-    await db.backup(dest);
-    log(req.user, 'Backup', `Download backup database ${stamp}`);
-    res.download(dest, `backup-smkn2-${stamp}.db`, err => {
-      if (err && !res.headersSent) next(err);
-      fs.promises.unlink(dest).catch(() => {});
+    await db.backup(databaseCopy);
+    log(req.user, 'Backup', `Download backup database dan unggahan ${stamp}`);
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename=backup-smkn2-${stamp}.zip`);
+    res.on('finish', cleanup);
+    res.on('close', cleanup);
+    const archive = archiver('zip', { zlib: { level: 6 } });
+    archive.on('error', err => {
+      cleanup();
+      if (!res.headersSent) next(err);
+      else res.destroy(err);
     });
-  } catch (err) { next(err); }
+    archive.pipe(res);
+    archive.file(databaseCopy, { name: 'data.db' });
+    if (fs.existsSync(uploadsDir)) archive.directory(uploadsDir, 'uploads');
+    archive.finalize();
+  } catch (err) {
+    await cleanup();
+    next(err);
+  }
 });
 
 // Demo personnel are intentionally not inserted into operational databases.
