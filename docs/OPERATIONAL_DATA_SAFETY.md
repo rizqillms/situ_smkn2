@@ -22,7 +22,7 @@
 - Reject attendance when coordinates are missing, invalid, out of range, or farther than 300 meters.
 - The 300-meter rule is the official geofence radius. GPS measurement accuracy is a separate technical consideration; do not silently treat 300 meters as an accuracy threshold.
 - Store server-generated attendance timestamp; do not trust the client-provided clock or attendance date/time.
-- Browser GPS accuracy may be submitted and stored as metadata; no accuracy-based rejection is active. Review device behavior and define an approved policy before enforcing any threshold.
+- GPS accuracy remains separate from the 300-meter rule; the current implementation neither stores nor rejects by accuracy. Review device behavior and obtain an approved policy before adding any accuracy threshold.
 - Use Asia/Makassar (WITA) for business-day and 08:00 lateness calculations.
 - Record user-entered attendance notes/reasons and include them in monthly reports, consistent with the current workflow.
 
