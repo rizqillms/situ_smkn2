@@ -57,9 +57,33 @@
   .gps-box b { color:#166534; }
   .notif-box { background:#fef3c7; border:1px solid #fde68a; border-radius:12px; padding:14px; margin-bottom:16px; }
   .notif-box b { color:#92400e; }
+
+/* UI/UX refresh */
+:root{color-scheme:light;--ink:#17243b;--muted:#64748b;--line:#e5eaf2;--canvas:#f4f7fb;--brand:#155eef;--brand-dark:#123b80;--brand-soft:#eaf2ff;--radius:18px;--shadow:0 8px 28px rgba(15,35,70,.055)}
+html{scroll-behavior:smooth}body{background:var(--canvas);color:var(--ink);line-height:1.55}
+.skip-link{position:fixed;z-index:2000;top:8px;left:8px;transform:translateY(-150%);background:#fff;color:var(--brand-dark);padding:10px 14px;border-radius:10px;box-shadow:var(--shadow)}.skip-link:focus{transform:translateY(0)}
+.topbar{position:relative;padding:22px clamp(18px,4vw,48px);background:linear-gradient(115deg,#102d59 0%,#155eef 68%,#1687d9 100%);box-shadow:0 8px 24px rgba(16,45,89,.16)}
+.topbar h1{font-size:clamp(1.08rem,2vw,1.4rem);letter-spacing:-.025em}.topbar .sub{color:rgba(255,255,255,.78);margin-top:2px}
+nav{position:sticky;top:0;z-index:100;padding:0 clamp(8px,3vw,32px);gap:4px;border-bottom:1px solid var(--line);box-shadow:0 4px 14px rgba(15,35,70,.035);scrollbar-width:thin}
+nav a{padding:15px 14px 12px;border-bottom-width:3px;font-size:.83rem;transition:color .18s ease,background .18s ease}nav a:hover,nav a.active{color:var(--brand);background:#f7faff}nav a.active{border-bottom-color:var(--brand)}
+.container{max-width:1440px;padding:clamp(18px,3vw,34px) clamp(14px,3vw,36px) 48px}
+.card{padding:clamp(18px,2.2vw,26px);margin-bottom:20px;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.card h2{color:#172f53;font-size:1.08rem;letter-spacing:-.02em}.card h3{color:#243b5d}.card p.sub{color:var(--muted);line-height:1.6}
+.stat-grid{gap:14px}.stat-card{min-width:0;padding:17px;border-radius:16px;border-color:var(--line);box-shadow:0 3px 12px rgba(15,35,70,.035);transition:transform .18s ease,box-shadow .18s ease}.stat-card:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(15,35,70,.075)}
+.stat-icon{flex:0 0 44px}.stat-info b{color:#172f53;font-size:1.55rem;letter-spacing:-.04em;line-height:1.2}.stat-info span{display:block;margin-top:4px;color:var(--muted);line-height:1.35}
+.btn{min-height:40px;padding:10px 16px;border-radius:10px;background:var(--brand);box-shadow:0 2px 5px rgba(21,94,239,.14);transition:background .16s ease,transform .16s ease,box-shadow .16s ease}.btn:hover{background:#124dcc;box-shadow:0 5px 12px rgba(21,94,239,.18);transform:translateY(-1px)}.btn:active{transform:translateY(0)}
+.btn-secondary{background:#fff;color:var(--brand);border:1px solid #c8d8f6;box-shadow:none}.btn-secondary:hover{background:var(--brand-soft);color:var(--brand-dark);box-shadow:none}.btn-small{min-height:32px;padding:6px 10px;border-radius:8px}
+input,select,textarea{min-height:42px;padding:10px 12px;color:var(--ink);background:#fff;border:1px solid #d7dfeb;border-radius:10px;transition:border-color .16s ease,box-shadow .16s ease}textarea{min-height:90px}input::placeholder,textarea::placeholder{color:#94a3b8}input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(21,94,239,.12)}label{color:#344866;margin-bottom:6px}
+table{display:block;width:100%;overflow-x:auto;border-collapse:separate;border-spacing:0;font-size:.84rem}th{position:sticky;top:0;z-index:1;padding:12px 13px;background:#f2f6fc;color:#425b7e;border-bottom:1px solid #dfe7f2;letter-spacing:.035em}td{padding:12px 13px;border-bottom:1px solid #edf1f6;vertical-align:middle}tbody tr:hover{background:#f8fbff}tbody tr:last-child td{border-bottom:0}
+.badge{padding:4px 10px;font-size:.72rem;letter-spacing:.01em}.gps-box,.notif-box{border-radius:14px;flex-wrap:wrap}.toast{max-width:min(92vw,520px);text-align:center;box-shadow:0 10px 30px rgba(15,23,42,.2)}.footer{color:#8290a5;background:#fff;border-top:1px solid var(--line)}.hidden{display:none!important}:focus-visible{outline:3px solid rgba(21,94,239,.5);outline-offset:2px}
+@media(max-width:760px){.topbar{align-items:flex-start;gap:10px;padding:17px 16px}.topbar>div:last-child{font-size:.72rem!important;max-width:48%}nav{padding:0 8px}nav a{padding:13px 11px 10px;font-size:.78rem}.container{padding:16px 12px 32px}.card{border-radius:15px;padding:16px}.stat-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.stat-card{padding:13px 11px;gap:9px}.stat-icon{width:38px;height:38px;flex-basis:38px;border-radius:10px}.stat-info b{font-size:1.3rem}table{font-size:.8rem}th,td{padding:10px;white-space:nowrap}}
+@media(max-width:390px){.stat-grid{grid-template-columns:1fr 1fr}.stat-card{align-items:flex-start;flex-direction:column}.topbar h1{font-size:1rem}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+
 </style>
 </head>
 <body>
+<a class="skip-link" href="#dashboard">Lewati navigasi</a>
 <div class="topbar">
   <div style="font-size:26px;">🎓</div>
   <div>
@@ -72,17 +96,17 @@
     <button onclick="logout()" style="margin-top:6px;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);padding:4px 12px;border-radius:999px;font-size:.75rem;cursor:pointer;">Keluar</button>
   </div>
 </div>
-<nav>
-  <a href="#" class="active" onclick="show('dashboard')">🏠 Dashboard</a>
-  <a href="#" onclick="show('surat-masuk')">📥 Surat Masuk</a>
-  <a href="#" onclick="show('surat-keluar')">📤 Surat Keluar</a>
-  <a href="#" onclick="show('absensi')">✅ Absensi</a>
-  <a href="#" onclick="show('pegawai')">👥 Kepegawaian</a>
-  <a href="#" onclick="show('rekap')">📊 Rekap</a>
-  <a href="#" onclick="show('laporan')">📝 Laporan Bulanan</a>
-  <a href="#" id="nav-log" onclick="show('log')">🧾 Log Aktivitas</a>
-  <a href="#" id="nav-profil" onclick="show('profil')">👤 Profil</a>
-  <a href="#" id="nav-pengguna" onclick="show('pengguna')">🔑 Pengguna</a>
+<nav aria-label="Navigasi utama">
+  <a href="#dashboard" data-section="dashboard" class="active" onclick="show('dashboard'); return false;">🏠 Dashboard</a>
+  <a href="#surat-masuk" data-section="surat-masuk" onclick="show('surat-masuk'); return false;">📥 Surat Masuk</a>
+  <a href="#surat-keluar" data-section="surat-keluar" onclick="show('surat-keluar'); return false;">📤 Surat Keluar</a>
+  <a href="#absensi" data-section="absensi" onclick="show('absensi'); return false;">✅ Absensi</a>
+  <a href="#pegawai" data-section="pegawai" onclick="show('pegawai'); return false;">👥 Kepegawaian</a>
+  <a href="#rekap" data-section="rekap" onclick="show('rekap'); return false;">📊 Rekap</a>
+  <a href="#laporan" data-section="laporan" onclick="show('laporan'); return false;">📝 Laporan Bulanan</a>
+  <a href="#log" data-section="log" id="nav-log" onclick="show('log'); return false;">🧾 Log Aktivitas</a>
+  <a href="#profil" data-section="profil" id="nav-profil" onclick="show('profil'); return false;">👤 Profil</a>
+  <a href="#pengguna" data-section="pengguna" id="nav-pengguna" onclick="show('pengguna'); return false;">🔑 Pengguna</a>
 </nav>
 
 <div class="container">
@@ -419,10 +443,16 @@ const bs=document.getElementById('bulan-surat'); if(bs) bs.value=document.getEle
 const bl=document.getElementById('bulan-lap'); if(bl) bl.value=document.getElementById('bulan').value;
 
 function show(id) {
-  ['dashboard','surat-masuk','surat-keluar','absensi','pegawai','rekap','laporan','log','profil','pengguna'].forEach(x => document.getElementById(x).classList.add('hidden'));
-  document.getElementById(id).classList.remove('hidden');
-  document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
-  event.target.classList.add('active');
+  const sections = ['dashboard','surat-masuk','surat-keluar','absensi','pegawai','rekap','laporan','log','profil','pengguna'];
+  if (!sections.includes(id)) return;
+  sections.forEach(x => document.getElementById(x)?.classList.add('hidden'));
+  document.getElementById(id)?.classList.remove('hidden');
+  document.querySelectorAll('nav a[data-section]').forEach(a => {
+    const active = a.dataset.section === id;
+    a.classList.toggle('active', active);
+    if (active) a.setAttribute('aria-current', 'page');
+    else a.removeAttribute('aria-current');
+  });
   if (id==='surat-masuk') loadSM();
   if (id==='surat-keluar') loadSK();
   if (id==='absensi') loadAbsen();
