@@ -104,7 +104,7 @@ jobs:
 
             const backup = await call('/api/backup', 'GET', undefined, admin);
             assert.equal(backup.response.status, 200, 'SQLite and uploads backup');
-            assert.match(backup.response.headers.get('content-type') || '', /application\\/zip/, 'backup is a ZIP archive');
+            assert.ok((backup.response.headers.get('content-type') || '').includes('application/zip'), 'backup is a ZIP archive');
             assert.ok(backup.raw.length > 100, 'backup archive is not empty');
 
             const protectedFile = await call('/uploads/no-such-file');
