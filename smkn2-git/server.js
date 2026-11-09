@@ -128,26 +128,29 @@ function log(user, aksi, detail) {
 // Seed users if empty
 const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get();
 if (userCount.c === 0) {
-  const ins = db.prepare('INSERT INTO users (username,password_hash,nama,role) VALUES (?,?,?,?)');
-  ins.run('admin', hashPass('admin123'), 'Administrator', 'admin');
-  ins.run('kepsek', hashPass('kepsek123'), 'Kepala Sekolah', 'kepsek');
-  ins.run('kasubag', hashPass('kasubag123'), 'Kasubag TU', 'kasubag');
-  ins.run('staff', hashPass('staff123'), 'Staff TU', 'staff');
-  const insG = db.prepare('INSERT INTO users (username,password_hash,nama,role,pegawai_id) VALUES (?,?,?,?,?)');
-  insG.run('budi', hashPass('guru123'), 'Budi Santoso, S.Pd', 'guru', 1);
-  insG.run('siti', hashPass('guru123'), 'Siti Rahayu, M.Pd', 'guru', 2);
-  insG.run('ahmad', hashPass('guru123'), 'Ahmad Yani, S.Pd', 'guru', 3);
-  insG.run('dewi', hashPass('guru123'), 'Dewi Lestari, S.Pd', 'guru', 4);
-  insG.run('rudi', hashPass('guru123'), 'Rudi Hermawan, S.Pd', 'guru', 5);
-  insG.run('fitri', hashPass('guru123'), 'Fitri Handayani, S.Pd', 'guru', 6);
+  const username = process.env.BOOTSTRAP_ADMIN_USERNAME;
+  const password = process.env.BOOTSTRAP_ADMIN_PASSWORD;
+  if (username && password && password.length >= 12) {
+    db.prepare('INSERT INTO users (username,password_hash,nama,role) VALUES (?,?,?,?)')
+      .run(username, hashPass(password), 'Administrator', 'admin');
+    console.log('Bootstrap administrator created from environment configuration.');
+  } else {
+    console.warn('No users exist. Configure BOOTSTRAP_ADMIN_USERNAME and BOOTSTRAP_ADMIN_PASSWORD (12+ chars) before first start.');
+  }
 }
 
 // ========== AUTH ==========
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
+  if (typeof username !== 'string' || typeof password !== 'string' || username.length > 100 || password.length > 200) {
+    return res.status(400).json({ error: 'Input login tidak valid' });
+  }
   const user = db.prepare('SELECT * FROM users WHERE username=?').get(username);
-  if (!user || user.password_hash !== hashPass(password)) {
+  if (!user || !verifyPass(password, user.password_hash)) {
     return res.status(401).json({ error: 'Username atau password salah' });
+  }
+  if (!user.password_hash.startsWith('$2')) {
+    db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hashPass(password), user.id);
   }
   const token = crypto.randomBytes(32).toString('hex');
   const expires = new Date(Date.now() + 24*60*60*1000).toISOString();
@@ -167,18 +170,27 @@ app.get('/api/me', (req, res) => {
 });
 app.post('/api/ganti-password', requireAuth, (req, res) => {
   const { lama, baru } = req.body;
-  if (!baru || baru.length < 6) return res.status(400).json({ error: 'Password baru minimal 6 karakter' });
-  if (req.user.password_hash !== hashPass(lama)) return res.status(400).json({ error: 'Password lama salah' });
+  if (typeof baru !== 'string' || baru.length < 12 || baru.length > 200) return res.status(400).json({ error: 'Password baru minimal 12 karakter' });
+  if (!verifyPass(lama, req.user.password_hash)) return res.status(400).json({ error: 'Password lama salah' });
   db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hashPass(baru), req.user.id);
   log(req.user, 'Ganti Password', 'Password berhasil diganti');
   res.json({ ok: true });
 });
 
 // Upload config
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
-const upload = multer({ dest: uploadsDir });
-app.use('/uploads', express.static(uploadsDir));
+const uploadsDir = path.join(dataDir, 'uploads');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+const upload = multer({
+  dest: uploadsDir,
+  limits: { fileSize: 10 * 1024 * 1024, files: 2 },
+  fileFilter(req, file, cb) {
+    if (!/\\.(jpe?g|png|webp|pdf|docx?|xlsx?|csv)$/i.test(file.originalname || '')) {
+      return cb(new Error('Jenis file tidak diizinkan'));
+    }
+    cb(null, true);
+  }
+});
+app.use('/uploads', requireAuth, express.static(uploadsDir, { dotfiles: 'deny', index: false }));
 
 // ========== SURAT MASUK ==========
 app.get('/api/surat-masuk', requireAuth, (req, res) => {
