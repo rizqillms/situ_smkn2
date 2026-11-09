@@ -510,7 +510,7 @@ app.get('/api/users', requireRole('admin','kasubag'), (req, res) => {
 });
 app.post('/api/users', requireRole('admin','kasubag'), (req, res) => {
   const { username, password, nama, role, pegawai_id } = req.body;
-  if (!username || !password || password.length < 6) return res.status(400).json({ error: 'Username & password (min 6) wajib diisi' });
+  if (typeof username !== 'string' || !/^[a-zA-Z0-9._-]{3,50}$/.test(username) || typeof password !== 'string' || password.length < 12 || password.length > 200) return res.status(400).json({ error: 'Username harus 3-50 karakter dan password minimal 12 karakter' });
   const exists = db.prepare('SELECT id FROM users WHERE username=?').get(username);
   if (exists) return res.status(400).json({ error: 'Username sudah dipakai' });
   db.prepare('INSERT INTO users (username,password_hash,nama,role,pegawai_id) VALUES (?,?,?,?,?)')
@@ -520,7 +520,7 @@ app.post('/api/users', requireRole('admin','kasubag'), (req, res) => {
 });
 app.put('/api/users/:id/reset-password', requireRole('admin','kasubag'), (req, res) => {
   const { password } = req.body;
-  if (!password || password.length < 6) return res.status(400).json({ error: 'Password minimal 6 karakter' });
+  if (typeof password !== 'string' || password.length < 12 || password.length > 200) return res.status(400).json({ error: 'Password minimal 12 karakter' });
   db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hashPass(password), req.params.id);
   log(req.user, 'User', `Reset password user id ${req.params.id}`);
   res.json({ ok: true });
