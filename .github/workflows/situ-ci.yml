@@ -34,17 +34,105 @@ jobs:
           print(f'Found {len(inline)} inline script(s)')
           PY
           for file in /tmp/situ-inline-*.js; do [ -e "$file" ] && node --check "$file"; done
-      - name: Smoke test isolated startup
+      - name: Smoke test isolated startup and key workflows
         run: |
           tmpdir="$(mktemp -d)"
           PORT=3210 DATA_DIR="$tmpdir" BOOTSTRAP_ADMIN_USERNAME=ci-admin BOOTSTRAP_ADMIN_PASSWORD='ci-only-password-2026' node server.js > "$tmpdir/server.log" 2>&1 &
           pid=$!
           trap 'kill "$pid" 2>/dev/null || true; rm -rf "$tmpdir"' EXIT
           for attempt in $(seq 1 30); do
-            if curl --fail --silent http://127.0.0.1:3210/healthz; then
-              exit 0
-            fi
+            if curl --fail --silent http://127.0.0.1:3210/healthz; then break; fi
             sleep 1
           done
-          cat "$tmpdir/server.log"
-          exit 1
+          node <<'NODE'
+          const assert = require('node:assert/strict');
+          const base = 'http://127.0.0.1:3210';
+          async function call(path, method = 'GET', body, token) {
+            const headers = {};
+            if (body !== undefined) headers['content-type'] = 'application/json';
+            if (token) headers['x-auth-token'] = token;
+            const response = await fetch(base + path, {
+              method, headers, body: body === undefined ? undefined : JSON.stringify(body)
+            });
+            const raw = await response.text();
+            let data = {};
+            try { data = raw ? JSON.parse(raw) : {}; } catch {}
+            return { response, data, raw };
+          }
+          (async () => {
+            const login = await call('/api/login', 'POST', { username: 'ci-admin', password: 'ci-only-password-2026' });
+            assert.equal(login.response.status, 200, 'admin login');
+            const admin = login.data.token;
+            const create = async (nama) => {
+              const r = await call('/api/pegawai', 'POST', { nama, status: 'PNS', jenis_pegawai: 'PNS' }, admin);
+              assert.equal(r.response.status, 200, 'create synthetic employee');
+              return r.data.id;
+            };
+            const hadirId = await create('CI Hadir');
+            const hadir = await call('/api/absensi', 'POST', {
+              pegawai_id: hadirId, status: 'Hadir', lat: -2.9317903, lng: 115.1820055
+            }, admin);
+            assert.equal(hadir.response.status, 200, 'attendance inside official geofence');
+            const duplicate = await call('/api/absensi', 'POST', {
+              pegawai_id: hadirId, status: 'Hadir', lat: -2.9317903, lng: 115.1820055
+            }, admin);
+            assert.equal(duplicate.response.status, 409, 'duplicate attendance blocked');
+
+            const outsideId = await create('CI Outside');
+            const outside = await call('/api/absensi', 'POST', {
+              pegawai_id: outsideId, status: 'Hadir', lat: 0, lng: 0
+            }, admin);
+            assert.equal(outside.response.status, 403, 'outside geofence blocked');
+
+            const izinId = await create('CI Izin');
+            const missingNote = await call('/api/absensi', 'POST', {
+              pegawai_id: izinId, status: 'Izin'
+            }, admin);
+            assert.equal(missingNote.response.status, 400, 'Izin requires a note');
+            const izin = await call('/api/absensi', 'POST', {
+              pegawai_id: izinId, status: 'Izin', keterangan: 'CI test note'
+            }, admin);
+            assert.equal(izin.response.status, 200, 'Izin with note accepted');
+
+            const parts = new Intl.DateTimeFormat('en-US', {
+              timeZone: 'Asia/Makassar', year: 'numeric', month: '2-digit'
+            }).formatToParts(new Date()).reduce((a, p) => (a[p.type] = p.value, a), {});
+            const month = parts.year + '-' + parts.month;
+            const report = await call('/api/absensi/rekap?bulan=' + month, 'GET', undefined, admin);
+            assert.equal(report.response.status, 200, 'monthly report accessible');
+            assert.match(report.data.find(x => x.nama === 'CI Izin').keterangan, /CI test note/, 'monthly note included');
+
+            const backup = await call('/api/backup', 'GET', undefined, admin);
+            assert.equal(backup.response.status, 200, 'SQLite online backup');
+            assert.ok(backup.raw.length > 100, 'backup contains database bytes');
+
+            const protectedFile = await call('/uploads/no-such-file');
+            assert.equal(protectedFile.response.status, 401, 'uploads require authentication');
+
+            const makeGuru = await call('/api/users', 'POST', {
+              username: 'ci-guru', password: 'ci-guru-password-2026',
+              nama: 'CI Guru', role: 'guru', pegawai_id: hadirId
+            }, admin);
+            assert.equal(makeGuru.response.status, 200, 'create teacher account');
+            const guruLogin = await call('/api/login', 'POST', {
+              username: 'ci-guru', password: 'ci-guru-password-2026'
+            });
+            assert.equal(guruLogin.response.status, 200, 'teacher login');
+            const guruToken = guruLogin.data.token;
+            const ownEmployees = await call('/api/pegawai', 'GET', undefined, guruToken);
+            assert.equal(ownEmployees.response.status, 200);
+            assert.equal(ownEmployees.data.length, 1, 'teacher sees own employee record only');
+            assert.equal(ownEmployees.data[0].alamat, undefined, 'teacher response excludes private address');
+            const confidentialLetters = await call('/api/surat-masuk', 'GET', undefined, guruToken);
+            assert.equal(confidentialLetters.response.status, 403, 'teacher cannot access office letters');
+            const crossAttendance = await call('/api/absensi', 'POST', {
+              pegawai_id: outsideId, status: 'Izin', keterangan: 'not mine'
+            }, guruToken);
+            assert.equal(crossAttendance.response.status, 403, 'teacher cannot mark another employee');
+
+            await call('/api/logout', 'POST', undefined, admin);
+            const expired = await call('/api/me', 'GET', undefined, admin);
+            assert.equal(expired.response.status, 401, 'logout invalidates session');
+            console.log('Smoke tests passed: auth, role scope, geofence, attendance notes, exports backup.');
+          })().catch(err => { console.error(err); process.exit(1); });
+          NODE
