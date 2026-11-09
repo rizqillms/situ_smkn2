@@ -219,14 +219,12 @@ const upload = multer({
   dest: uploadsDir,
   limits: { fileSize: 10 * 1024 * 1024, files: 2 },
   fileFilter(req, file, cb) {
-    if (!/\\.(jpe?g|png|webp|pdf|docx?|xlsx?|csv)$/i.test(file.originalname || '')) {
-      return cb(new Error('Jenis file tidak diizinkan'));
-    }
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const allowed = ['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.csv'];
+    if (!allowed.includes(ext)) return cb(new Error('Jenis file tidak diizinkan'));
     cb(null, true);
   }
 });
-app.use('/uploads', requireAuth, express.static(uploadsDir, { dotfiles: 'deny', index: false }));
-
 // ========== SURAT MASUK ==========
 app.get('/api/surat-masuk', requireAuth, (req, res) => {
   const rows = db.prepare('SELECT * FROM surat_masuk ORDER BY tanggal DESC').all();
