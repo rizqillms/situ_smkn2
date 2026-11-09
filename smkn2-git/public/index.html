@@ -434,7 +434,7 @@ updateNomor();
 
 async function loadStats(){ const [sm,sk,pg,ab] = await Promise.all([api('/api/surat-masuk').then(r=>r.json()), api('/api/surat-keluar').then(r=>r.json()), api('/api/pegawai').then(r=>r.json()), api('/api/absensi?tanggal='+new Date().toISOString().slice(0,10)).then(r=>r.json())]); document.getElementById('stat-sm').textContent=sm.length; document.getElementById('stat-sk').textContent=sk.length; document.getElementById('stat-hadir').textContent=ab.filter(a=>a.status==='Hadir').length; document.getElementById('stat-telat').textContent=ab.filter(a=>a.telat_menit>0).length; const notif=await api('/api/pegawai/notifikasi').then(r=>r.json()); if(notif.length){ document.getElementById('notif-wrap').innerHTML=`<div class="notif-box"><b>🔔 Notifikasi Kenaikan Pangkat:</b><br>${notif.map(n=>`• ${n.nama} — ${n.tanggal_naik_pangkat}`).join('<br>')}</div>`; } const hadir=ab.filter(a=>a.status==='Hadir').length; const total=pg.length||1; const set=(id,v)=>{const e=document.getElementById(id); if(e) e.textContent=v;}; set('kp-guru',pg.length); set('kp-hadir',hadir); set('kp-telat',ab.filter(a=>a.telat_menit>0).length); set('kp-persen',Math.round(hadir/total*100)+'%'); const kn=document.getElementById('kp-notif'); if(kn && notif.length) kn.innerHTML=`<div class="notif-box"><b>Pengingat Kenaikan Pangkat:</b><br>${notif.map(n=>`• ${n.nama} — ${n.tanggal_naik_pangkat}`).join('<br>')}</div>`; }
 async function loadSM(){ const rows=await api('/api/surat-masuk').then(r=>r.json()); document.getElementById('list-sm').innerHTML=rows.map(r=>`<tr><td>${r.nomor}</td><td>${r.tanggal}</td><td>${r.dari}</td><td>${r.perihal}</td><td>${r.foto?'<span class="badge badge-masuk">Ada</span>':'-'}</td><td style="white-space:nowrap;"><button class="btn btn-small" onclick="editSM(${r.id})">Edit</button> <button class="btn btn-small" style="background:#ef4444;" onclick="hapusSM(${r.id})">Hapus</button></td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:#94a3b8;">Belum ada surat masuk</td></tr>'; }
-async function loadSK(){ const rows=await api('/api/surat-keluar').then(r=>r.json()); document.getElementById('list-sk').innerHTML=rows.map(r=>`<tr><td>${r.nomor}</td><td>${r.tanggal}</td><td>${r.tujuan}</td><td>${r.perihal}</td><td><a href="/api/surat-keluar/${r.id}/pdf?token=${token}" class="btn btn-small">PDF</a></td><td style="white-space:nowrap;"><button class="btn btn-small" onclick="editSK(${r.id})">Edit</button> <button class="btn btn-small" style="background:#ef4444;" onclick="hapusSK(${r.id})">Hapus</button></td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:#94a3b8;">Belum ada surat keluar</td></tr>'; }
+async function loadSK(){ const rows=await api('/api/surat-keluar').then(r=>r.json()); document.getElementById('list-sk').innerHTML=rows.map(r=>`<tr><td>${r.nomor}</td><td>${r.tanggal}</td><td>${r.tujuan}</td><td>${r.perihal}</td><td><button onclick="downloadProtected('/api/surat-keluar/${r.id}/pdf','surat-keluar-${r.id}.pdf')" class="btn btn-small">PDF</button></td><td style="white-space:nowrap;"><button class="btn btn-small" onclick="editSK(${r.id})">Edit</button> <button class="btn btn-small" style="background:#ef4444;" onclick="hapusSK(${r.id})">Hapus</button></td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:#94a3b8;">Belum ada surat keluar</td></tr>'; }
 async function loadAbsen(){
   const [pgRes, abRes] = await Promise.all([api('/api/pegawai'), api('/api/absensi')]);
   const pg = await pgRes.json(), ab = await abRes.json();
@@ -475,9 +475,9 @@ async function loadRekapPegawai(){
   // (rekap pegawai: hanya total per status + daftar semua pegawai)
   document.getElementById('list-rk-pg').innerHTML=(d.semua||[]).map(r=>`<tr><td>${r.nama}</td><td>${r.jenis_kelamin||'-'}</td><td>${r.nip||'-'}</td><td>${r.golongan||'-'}</td><td>${r.jabatan||'-'}</td><td>${r.jenis||r.status||'-'}</td><td>${r.agama||'-'}</td><td>${r.pendidikan||'-'}</td><td>${r.no_hp||'-'}</td><td>${r.periode_tahun?r.periode_tahun+'-'+String(r.periode_bulan||'').padStart(2,'0'):'-'}</td><td>${r.tanggal_naik_pangkat||'-'}</td></tr>`).join('');
 }
-function exportSuratExcel(){ const b=document.getElementById('bulan-surat').value||document.getElementById('bulan').value; window.open('/api/rekap/surat/excel?bulan='+b+'&token='+token); }
-function exportPegawaiExcel(){ window.open('/api/rekap/pegawai/excel?token='+token); }
-async async function loadRekap(){ const b=document.getElementById('bulan').value; const response=await api('/api/absensi/rekap?bulan='+encodeURIComponent(b)); const rows=await response.json(); document.getElementById('list-rekap').innerHTML=rows.map(r=>`<tr><td>${esc(r.nama)}</td><td>${r.hadir||0}</td><td>${r.telat||0}</td><td>${r.total_telat||0} mnt</td><td>${r.izin||0}</td><td>${r.sakit||0}</td><td>${esc(r.keterangan||'-')}</td></tr>`).join(''); }
+function exportSuratExcel(){ const b=document.getElementById('bulan-surat').value||document.getElementById('bulan').value; return downloadProtected('/api/rekap/surat/excel?bulan='+encodeURIComponent(b),'rekap-surat.xlsx'); }
+function exportPegawaiExcel(){ return downloadProtected('/api/rekap/pegawai/excel','rekap-pegawai.xlsx'); }
+async function loadRekap(){ const b=document.getElementById('bulan').value; const response=await api('/api/absensi/rekap?bulan='+encodeURIComponent(b)); const rows=await response.json(); document.getElementById('list-rekap').innerHTML=rows.map(r=>`<tr><td>${esc(r.nama)}</td><td>${r.hadir||0}</td><td>${r.telat||0}</td><td>${r.total_telat||0} mnt</td><td>${r.izin||0}</td><td>${r.sakit||0}</td><td>${esc(r.keterangan||'-')}</td></tr>`).join(''); }
 async function doAbsen(id,status){
   let keterangan = '';
   if (status === 'Izin' || status === 'Sakit') {
@@ -503,7 +503,7 @@ async function doAbsen(id,status){
     { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
   );
 }
-function exportExcel(){ const b=document.getElementById('bulan').value; window.open('/api/absensi/rekap/excel?bulan='+b); }
+function exportExcel(){ const b=document.getElementById('bulan').value; return downloadProtected('/api/absensi/rekap/excel?bulan='+encodeURIComponent(b),'rekap-absensi.xlsx'); }
 async function submitSM(e){ e.preventDefault(); const fd=new FormData(e.target); await api('/api/surat-masuk',{method:'POST',body:fd}); toast('Surat masuk tersimpan!'); e.target.reset(); loadSM(); return false; }
 async function submitSK(e){ e.preventDefault(); const data=Object.fromEntries(new FormData(e.target).entries()); await api('/api/surat-keluar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}); toast('Surat keluar tersimpan!'); loadSK(); return false; }
 async function submitPG(e){ e.preventDefault(); const data=Object.fromEntries(new FormData(e.target).entries()); await api('/api/pegawai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}); toast('Pegawai tersimpan!'); loadPG(); return false; }
@@ -525,6 +525,26 @@ function showModal(html){
   document.getElementById('modal-wrap').innerHTML = `<div style="position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)closeModal()"><div style="background:#fff;border-radius:16px;padding:22px;width:100%;max-width:520px;max-height:90vh;overflow:auto;">${html}</div></div>`;
 }
 function closeModal(){ document.getElementById('modal-wrap').innerHTML=''; }
+async function downloadProtected(path, fallbackName){
+  const response = await api(path);
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    toast(data.error || 'Unduhan gagal. Silakan login ulang.');
+    return;
+  }
+  const blob = await response.blob();
+  const disposition = response.headers.get('Content-Disposition') || '';
+  const match = disposition.match(/filename="?([^";]+)"?/i);
+  const filename = match ? match[1] : fallbackName;
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
 async function openUpload(filename){
   const response = await api('/uploads/' + encodeURIComponent(filename));
   if (!response.ok) { toast('File tidak dapat diakses. Silakan login ulang.'); return; }
@@ -613,50 +633,8 @@ async function gantiPassword(e){
   else toast(res.error || 'Gagal ganti password');
   return false;
 }
-function doBackup(){ window.open('/api/backup?token='+token); toast('Backup mulai diunduh...'); }
+function doBackup(){ return downloadProtected('/api/backup','backup-smkn2.db'); }
 
-// ===== GPS di Absensi =====
-function getPos(){
-  return new Promise((resolve)=>{
-    if (!navigator.geolocation) return resolve(null);
-    navigator.geolocation.getCurrentPosition(
-      pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => resolve(null),
-      { timeout: 8000 }
-    );
-  });
-}
-// override doAbsen lama biar kirim GPS
-const _doAbsenLama = doAbsen;
-doAbsen = async function(id, status){
-  const now = new Date();
-  const jam = now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
-  let payload = { pegawai_id:id, tanggal: now.toISOString().slice(0,10), jam, status };
-  if (status === 'Izin' || status === 'Sakit') {
-    const ket = prompt(status === 'Izin' ? 'Keterangan izin (wajib):' : 'Keterangan sakit (wajib):');
-    if (!ket || !ket.trim()) { toast('Keterangan wajib diisi untuk ' + status); return; }
-    payload.keterangan = ket.trim();
-  } else {
-    const pos = await getPos();
-    if (!pos) { toast('Lokasi wajib diaktifkan untuk absen Hadir. Izinkan akses lokasi di browser.'); return; }
-    const sekolah = JSON.parse(localStorage.getItem('sekolah') || 'null');
-    if (sekolah) {
-      const d = jarakMeter(pos.lat, pos.lng, sekolah.lat, sekolah.lng);
-      if (d > 300) { toast(`Di luar radius sekolah (${Math.round(d)}m > 300m). Pindah ke dalam area sekolah dulu.`); return; }
-    }
-    payload.lat = pos.lat; payload.lng = pos.lng;
-  }
-  const res = await api('/api/absensi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(r=>r.json());
-  if (res.ok) toast(res.telat ? `Hadir • Telat ${res.telat} menit` : `Absensi: ${status} • ${jam}`);
-  else toast(res.error || 'Gagal absen');
-  loadAbsen();
-};
-function jarakMeter(lat1, lon1, lat2, lon2){
-  const R = 6371000, rad = x => x * Math.PI / 180;
-  const dLat = rad(lat2-lat1), dLon = rad(lon2-lon1);
-  const a = Math.sin(dLat/2)**2 + Math.cos(rad(lat1))*Math.cos(rad(lat2))*Math.sin(dLon/2)**2;
-  return 2 * R * Math.asin(Math.sqrt(a));
-}
 // ===== LAPORAN BULANAN =====
 let divisiList = [];
 async function loadDivisi(){
