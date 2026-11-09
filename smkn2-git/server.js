@@ -127,7 +127,7 @@ function distanceMeters(lat1, lng1, lat2, lng2) {
   return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 function getUser(req) {
-  const token = req.headers['x-auth-token'] || req.query.token;
+  const token = req.headers['x-auth-token'];
   if (!token || typeof token !== 'string') return null;
   const row = db.prepare('SELECT u.*, s.expires_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=?').get(token);
   if (!row) return null;
@@ -227,7 +227,7 @@ const upload = multer({
 });
 app.use('/uploads', requireAuth, express.static(uploadsDir, { dotfiles: 'deny', index: false }));
 // ========== SURAT MASUK ==========
-app.get('/api/surat-masuk', requireAuth, (req, res) => {
+app.get('/api/surat-masuk', requireRole('admin','kasubag','staff','kepsek'), (req, res) => {
   const rows = db.prepare('SELECT * FROM surat_masuk ORDER BY tanggal DESC').all();
   res.json(rows);
 });
@@ -252,7 +252,7 @@ app.delete('/api/surat-masuk/:id', requireRole('admin','kasubag','staff'), (req,
 });
 
 // ========== SURAT KELUAR ==========
-app.get('/api/surat-keluar', requireAuth, (req, res) => {
+app.get('/api/surat-keluar', requireRole('admin','kasubag','staff','kepsek'), (req, res) => {
   const rows = db.prepare('SELECT * FROM surat_keluar ORDER BY tanggal DESC').all();
   res.json(rows);
 });
@@ -274,7 +274,7 @@ app.delete('/api/surat-keluar/:id', requireRole('admin','kasubag','staff'), (req
   log(req.user, 'Surat Keluar', `Hapus surat ${row ? row.nomor : ''}`);
   res.json({ ok: true });
 });
-app.get('/api/surat-keluar/:id/pdf', requireAuth, (req, res) => {
+app.get('/api/surat-keluar/:id/pdf', requireRole('admin','kasubag','staff','kepsek'), (req, res) => {
   const s = db.prepare('SELECT * FROM surat_keluar WHERE id=?').get(req.params.id);
   if (!s) return res.status(404).send('Not found');
   const doc = new PDFDocument();
@@ -301,6 +301,10 @@ app.get('/api/surat-keluar/:id/pdf', requireAuth, (req, res) => {
 
 // ========== PEGAWAI ==========
 app.get('/api/pegawai', requireAuth, (req, res) => {
+  if (req.user.role === 'guru') {
+    const rows = db.prepare('SELECT id, nama, jenis_pegawai, status, jabatan FROM pegawai WHERE id=?').all(req.user.pegawai_id || 0);
+    return res.json(rows);
+  }
   const rows = db.prepare('SELECT * FROM pegawai ORDER BY nama').all();
   res.json(rows);
 });
@@ -355,12 +359,21 @@ app.get('/api/pegawai/notifikasi', requireRole('admin','kasubag','kepsek'), (req
 
 // ========== ABSENSI ==========
 app.get('/api/absensi', requireAuth, (req, res) => {
-  const { tanggal } = req.query;
-  const rows = db.prepare(`
-    SELECT p.nama, a.jam, a.status, a.telat_menit, a.keterangan FROM absensi a
-    JOIN pegawai p ON p.id = a.pegawai_id
-    WHERE a.tanggal = ? ORDER BY p.nama
-  `).all(tanggal || schoolDateTime().date);
+  const tanggal = req.query.tanggal || schoolDateTime().date;
+  let rows;
+  if (req.user.role === 'guru') {
+    rows = db.prepare(`
+      SELECT p.nama, a.jam, a.status, a.telat_menit, a.keterangan FROM absensi a
+      JOIN pegawai p ON p.id = a.pegawai_id
+      WHERE a.tanggal = ? AND a.pegawai_id = ? ORDER BY p.nama
+    `).all(tanggal, req.user.pegawai_id || 0);
+  } else {
+    rows = db.prepare(`
+      SELECT p.nama, a.jam, a.status, a.telat_menit, a.keterangan FROM absensi a
+      JOIN pegawai p ON p.id = a.pegawai_id
+      WHERE a.tanggal = ? ORDER BY p.nama
+    `).all(tanggal);
+  }
   res.json(rows);
 });
 app.post('/api/absensi', requireAuth, (req, res) => {
