@@ -638,10 +638,17 @@ async function loadPG(){
   const rows = await api('/api/pegawai').then(r=>r.json());
   document.getElementById('list-pg').innerHTML = rows.map(r=>{
     const isPJLP = r.jenis_pegawai === 'PJLP' || r.status === 'PJLP';
+    // Naik pangkat HANYA untuk PNS. PPPK/Guru Non ASN/PJLP tampil '-'
+    const isPNS = r.jenis_pegawai === 'PNS' || r.status === 'PNS';
     let next = '-';
-    if (!isPJLP) {
-      const last = new Date(r.tanggal_pangkat_terakhir || r.tanggal_naik_pangkat || r.tanggal_mulai || '2000-01-01');
-      if (!isNaN(last)) { const nx = new Date(last); nx.setFullYear(nx.getFullYear()+4); next = nx.toISOString().slice(0,10); }
+    if (isPNS) {
+      let last = null;
+      if (r.periode_tahun && r.periode_bulan) last = new Date(Number(r.periode_tahun), Number(r.periode_bulan) - 1, 1);
+      else {
+        const s = r.tanggal_pangkat_terakhir || r.tanggal_naik_pangkat || r.tanggal_mulai;
+        if (s) last = new Date(s);
+      }
+      if (last && !isNaN(last)) { const nx = new Date(last); nx.setFullYear(nx.getFullYear()+4); next = nx.toISOString().slice(0,10); }
     }
     return `<tr><td>${esc(r.nama)}</td><td>${esc(r.jenis_kelamin||'-')}</td>
       <td>${isPJLP?'—':esc(r.nip||'-')}</td><td>${isPJLP?'—':esc(r.golongan||'-')}</td>
@@ -936,7 +943,7 @@ function togglePJLP(){
   const j = document.getElementById('jenis-pg').value;
   const sh = document.getElementById('status-hidden'); if (sh) sh.value = j;
   const isPJLP = j === 'PJLP';
-  const isPNS = j === 'PNS';
+  const isPNS = j === 'PNS'; // Golongan & Periode hanya untuk PNS
   const form = document.querySelector('#form-pg form');
   if (!form) return;
   const setDis = (name, dis) => { const el = form.querySelector('[name="'+name+'"]'); if (el) { el.disabled = dis; if (dis) el.value=''; } };
