@@ -365,7 +365,7 @@ app.delete('/api/pegawai/:id', requireRole('admin','kasubag'), (req, res) => {
   res.json({ ok: true });
 });
 app.get('/api/pegawai/notifikasi', requireRole('admin','kasubag','kepsek'), (req, res) => {
-  const rows = db.prepare("SELECT * FROM pegawai WHERE jenis_pegawai != 'PJLP' AND status != 'PJLP'").all();
+  const rows = db.prepare("SELECT * FROM pegawai WHERE COALESCE(NULLIF(jenis_pegawai,''), status) = 'PNS'").all();
   const today = new Date();
   const notifs = [];
   rows.forEach(r => {
