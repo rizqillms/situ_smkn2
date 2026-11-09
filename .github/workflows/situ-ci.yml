@@ -2,9 +2,9 @@ name: SITU CI
 
 on:
   push:
-    branches: [main, hardening/phase-1]
+    branches: [main, hardening/phase-1, 'uiux/**']
   pull_request:
-    branches: [main]
+    branches: [main, hardening/phase-1]
 
 jobs:
   smoke-test:
