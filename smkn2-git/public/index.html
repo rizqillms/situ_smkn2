@@ -386,7 +386,7 @@
   </div>
   <div class="card" style="max-width:480px;">
     <h2>💾 Backup Data</h2>
-    <p class="sub">Download semua data sistem (surat, absensi, pegawai) sebagai file cadangan.</p>
+    <p class="sub">Download database dan seluruh file unggahan sebagai arsip ZIP cadangan.</p>
     <button class="btn" onclick="doBackup()">⬇ Download Backup Database</button>
     <p style="font-size:.8rem; color:#64748b; margin-top:10px;">Lakukan backup berkala (misal tiap minggu) dan simpan di tempat aman.</p>
   </div>
@@ -633,7 +633,7 @@ async function gantiPassword(e){
   else toast(res.error || 'Gagal ganti password');
   return false;
 }
-function doBackup(){ return downloadProtected('/api/backup','backup-smkn2.db'); }
+function doBackup(){ return downloadProtected('/api/backup','backup-smkn2.zip'); }
 
 // ===== LAPORAN BULANAN =====
 let divisiList = [];
