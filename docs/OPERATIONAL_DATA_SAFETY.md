@@ -22,7 +22,7 @@
 - Reject attendance when coordinates are missing, invalid, out of range, or farther than 300 meters.
 - The 300-meter rule is the official geofence radius. GPS measurement accuracy is a separate technical consideration; do not silently treat 300 meters as an accuracy threshold.
 - Store server-generated attendance timestamp; do not trust the client-provided clock or attendance date/time.
-- Review browser/device GPS accuracy reporting and define a defensible handling policy before enforcing accuracy-based rejection.
+- Browser GPS accuracy may be submitted and stored as metadata; no accuracy-based rejection is active. Review device behavior and define an approved policy before enforcing any threshold.
 - Use Asia/Makassar (WITA) for business-day and 08:00 lateness calculations.
 - Record user-entered attendance notes/reasons and include them in monthly reports, consistent with the current workflow.
 
@@ -34,9 +34,17 @@
 - [ ] Create and restore-test a backup of the current database and uploads.
 - [ ] Select persistent production database and file storage.
 - [ ] Rotate all demo/default credentials and provision named accounts.
-- [ ] Complete endpoint-by-endpoint authorization and upload review.
+- [x] Initial endpoint authorization and upload protections implemented; [ ] final manual review of every endpoint and role.
 - [ ] Test migration and rollback on a sanitized copy.
 - [ ] Obtain school approval for go-live and data handling.
 
+## Implementation status
+- Backend validates the official geofence and calculates attendance date/time in WITA.
+- Teachers are restricted to their own employee and attendance records.
+- Attendance notes are included in monthly aggregate and Excel export.
+- Uploaded files require an authenticated request and uploads are size/extension limited.
+- Backup endpoint creates a consistent SQLite snapshot and packages it together with the uploads directory as a ZIP.
+- Automated tests use a temporary database and synthetic records only.
+
 ## Current decision
-The database and upload directory remain on the owner's local PC. Because the current system contains real data, feature development and security changes must be performed on an isolated copy. No live database migration or deployment is authorized by this document.
+The database and upload directory remain on the owner's local PC. Because the current system contains real data, feature development and security changes must be performed on an isolated copy. No live database migration or deployment is authorized by this document. A backup/restore test using the real operational files must be performed by the data owner on a separate location before any production cutover.
