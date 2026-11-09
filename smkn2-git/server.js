@@ -655,4 +655,19 @@ app.get('/api/backup', requireRole('admin','kasubag'), async (req, res, next) =>
 
 // Demo personnel are intentionally not inserted into operational databases.
 
+app.get('/healthz', (req, res) => {
+  try {
+    db.prepare('SELECT 1').get();
+    res.json({ ok: true, service: 'situ-smkn2' });
+  } catch (err) {
+    res.status(503).json({ ok: false });
+  }
+});
+app.use((err, req, res, next) => {
+  console.error(err && err.message ? err.message : 'Request error');
+  if (res.headersSent) return next(err);
+  if (err && err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'Ukuran file maksimal 10 MB' });
+  if (err && err.message === 'Jenis file tidak diizinkan') return res.status(400).json({ error: err.message });
+  res.status(400).json({ error: 'Permintaan tidak dapat diproses' });
+});
 app.listen(PORT, () => console.log(`SMKN 2 Rantau TU running on :${PORT}`));
