@@ -173,14 +173,7 @@
 <!-- ABSENSI -->
 <div id="absensi" class="hidden">
   <div class="card">
-    <div class="gps-box"><b>📍 Lokasi: Di Dalam Sekolah ✓</b> <span style="font-size:.8rem; color:#475569; margin-left:8px;">GPS aktif • Radius 300m dari sekolah</span></div>
-    <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:10px; padding:12px; margin-bottom:12px; font-size:.84rem; color:#475569;">
-      ⚙️ <b>Atur Lokasi Sekolah:</b> Buka halaman ini pakai HP di dalam sekolah, lalu klik tombol di bawah. Sistem akan menyimpan titik sekolah (radius 300m).
-      <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
-        <button class="btn btn-secondary btn-small" onclick="setSekolah()">📍 Simpan Titik Sekolah Sekarang</button>
-        <span id="sekolah-info" style="font-size:.8rem; color:#64748b;"></span>
-      </div>
-    </div>
+    <div class="gps-box"><b>📍 Geofence Sekolah</b> <span style="font-size:.8rem; color:#475569; margin-left:8px;">Titik resmi sekolah • Radius 300 meter</span></div>
     <h2>✅ Absensi — <span id="absen-date"></span></h2>
     <p class="sub">Batas masuk 08:00. Telat tetap dicatet & masuk laporan.</p>
     <table><tr><th>Nama</th><th>Status</th><th>Jam</th><th>Aksi</th></tr><tbody id="list-absen"></tbody></table>
@@ -442,8 +435,15 @@ updateNomor();
 async function loadStats(){ const [sm,sk,pg,ab] = await Promise.all([api('/api/surat-masuk').then(r=>r.json()), api('/api/surat-keluar').then(r=>r.json()), api('/api/pegawai').then(r=>r.json()), api('/api/absensi?tanggal='+new Date().toISOString().slice(0,10)).then(r=>r.json())]); document.getElementById('stat-sm').textContent=sm.length; document.getElementById('stat-sk').textContent=sk.length; document.getElementById('stat-hadir').textContent=ab.filter(a=>a.status==='Hadir').length; document.getElementById('stat-telat').textContent=ab.filter(a=>a.telat_menit>0).length; const notif=await api('/api/pegawai/notifikasi').then(r=>r.json()); if(notif.length){ document.getElementById('notif-wrap').innerHTML=`<div class="notif-box"><b>🔔 Notifikasi Kenaikan Pangkat:</b><br>${notif.map(n=>`• ${n.nama} — ${n.tanggal_naik_pangkat}`).join('<br>')}</div>`; } const hadir=ab.filter(a=>a.status==='Hadir').length; const total=pg.length||1; const set=(id,v)=>{const e=document.getElementById(id); if(e) e.textContent=v;}; set('kp-guru',pg.length); set('kp-hadir',hadir); set('kp-telat',ab.filter(a=>a.telat_menit>0).length); set('kp-persen',Math.round(hadir/total*100)+'%'); const kn=document.getElementById('kp-notif'); if(kn && notif.length) kn.innerHTML=`<div class="notif-box"><b>Pengingat Kenaikan Pangkat:</b><br>${notif.map(n=>`• ${n.nama} — ${n.tanggal_naik_pangkat}`).join('<br>')}</div>`; }
 async function loadSM(){ const rows=await api('/api/surat-masuk').then(r=>r.json()); document.getElementById('list-sm').innerHTML=rows.map(r=>`<tr><td>${r.nomor}</td><td>${r.tanggal}</td><td>${r.dari}</td><td>${r.perihal}</td><td>${r.foto?'<span class="badge badge-masuk">Ada</span>':'-'}</td><td style="white-space:nowrap;"><button class="btn btn-small" onclick="editSM(${r.id})">Edit</button> <button class="btn btn-small" style="background:#ef4444;" onclick="hapusSM(${r.id})">Hapus</button></td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:#94a3b8;">Belum ada surat masuk</td></tr>'; }
 async function loadSK(){ const rows=await api('/api/surat-keluar').then(r=>r.json()); document.getElementById('list-sk').innerHTML=rows.map(r=>`<tr><td>${r.nomor}</td><td>${r.tanggal}</td><td>${r.tujuan}</td><td>${r.perihal}</td><td><a href="/api/surat-keluar/${r.id}/pdf?token=${token}" class="btn btn-small">PDF</a></td><td style="white-space:nowrap;"><button class="btn btn-small" onclick="editSK(${r.id})">Edit</button> <button class="btn btn-small" style="background:#ef4444;" onclick="hapusSK(${r.id})">Hapus</button></td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:#94a3b8;">Belum ada surat keluar</td></tr>'; }
-async function loadAbsen(){ const _s=JSON.parse(localStorage.getItem('sekolah')||'null'); const _si=document.getElementById('sekolah-info'); if(_si && _s) _si.textContent='Tersimpan: '+_s.lat.toFixed(5)+', '+_s.lng.toFixed(5);
-  const pg=await api('/api/pegawai').then(r=>r.json()); const ab=await api('/api/absensi?tanggal='+new Date().toISOString().slice(0,10)).then(r=>r.json()); document.getElementById('list-absen').innerHTML=pg.map(p=>{ const a=ab.find(x=>x.nama===p.nama); if(a) return `<tr><td>${p.nama}</td><td><span class="badge ${a.status==='Hadir'?'badge-hadir':a.status==='Izin'?'badge-izin':'badge-sakit'}">${a.status}</span></td><td>${a.jam}${a.telat_menit>0?` (Telat ${a.telat_menit} mnt)`:''}${a.keterangan?`<div style="font-size:.75rem;color:#64748b;">${a.keterangan}</div>`:''}</td><td><span style="color:#94a3b8;font-size:.8rem;">Sudah absen</span></td></tr>`; return `<tr><td>${p.nama}</td><td>-</td><td>-</td><td><div style="display:flex;gap:5px;"><button class="btn btn-small btn-hadir" onclick="doAbsen(${p.id},'Hadir')">Hadir</button><button class="btn btn-small btn-izin" onclick="doAbsen(${p.id},'Izin')">Izin</button><button class="btn btn-small btn-sakit" onclick="doAbsen(${p.id},'Sakit')">Sakit</button></div></td></tr>`; }).join(''); }
+async function loadAbsen(){
+  const [pgRes, abRes] = await Promise.all([api('/api/pegawai'), api('/api/absensi')]);
+  const pg = await pgRes.json(), ab = await abRes.json();
+  document.getElementById('list-absen').innerHTML = pg.map(p => {
+    const a = ab.find(x => x.nama === p.nama);
+    if (a) return `<tr><td>${esc(p.nama)}</td><td><span class="badge ${a.status==='Hadir'?'badge-hadir':a.status==='Izin'?'badge-izin':'badge-sakit'}">${esc(a.status)}</span></td><td>${esc(a.jam)}${a.telat_menit>0?` (Telat ${a.telat_menit} mnt)`:''}${a.keterangan?`<div style="font-size:.75rem;color:#64748b;">${esc(a.keterangan)}</div>`:''}</td><td><span style="color:#94a3b8;font-size:.8rem;">Sudah absen</span></td></tr>`;
+    return `<tr><td>${esc(p.nama)}</td><td>-</td><td>-</td><td><div style="display:flex;gap:5px;"><button class="btn btn-small btn-hadir" onclick="doAbsen(${p.id},'Hadir')">Hadir</button><button class="btn btn-small btn-izin" onclick="doAbsen(${p.id},'Izin')">Izin</button><button class="btn btn-small btn-sakit" onclick="doAbsen(${p.id},'Sakit')">Sakit</button></div></td></tr>`;
+  }).join('');
+}
 async function loadPG(){ const rows=await api('/api/pegawai').then(r=>r.json()); document.getElementById('list-pg').innerHTML=rows.map(r=>{ const isPJLP=(r.jenis_pegawai==='PJLP'||r.status==='PJLP'); let next='-'; if(!isPJLP){ const last=new Date(r.tanggal_pangkat_terakhir||r.tanggal_naik_pangkat||r.tanggal_mulai||'2000-01-01'); if(!isNaN(last)){ const nx=new Date(last); nx.setFullYear(nx.getFullYear()+4); next=nx.toISOString().slice(0,10); } } return `<tr><td>${r.nama}</td><td>${r.jenis_kelamin||'-'}</td><td>${isPJLP?'—':(r.nip||'-')}</td><td>${isPJLP?'—':(r.golongan||'-')}</td><td>${r.jabatan||'-'}</td><td><span class="badge ${isPJLP?'badge-izin':'badge-masuk'}">${r.jenis_pegawai||r.status||'-'}</span></td><td>${r.agama||'-'}</td><td>${r.pendidikan||'-'}</td><td>${next}</td><td style="white-space:nowrap;"><button class="btn btn-small" onclick="editPG(${r.id})">Edit</button> <button class="btn btn-small" style="background:#ef4444;" onclick="hapusPG(${r.id})">Hapus</button></td></tr>`; }).join(''); }
 async function loadNotifikasi(){ const n=await api('/api/pegawai/notifikasi').then(r=>r.json()); document.getElementById('notif-pegawai').innerHTML=n.length?`<div class="notif-box"><b>🔔 Pengingat Kenaikan Pangkat (90 hari ke depan):</b><br>${n.map(x=>`• ${x.nama} — ${x.tanggal_naik_pangkat}`).join('<br>')}</div>`:''; }
 function switchRekap(t){
@@ -478,7 +478,31 @@ async function loadRekapPegawai(){
 function exportSuratExcel(){ const b=document.getElementById('bulan-surat').value||document.getElementById('bulan').value; window.open('/api/rekap/surat/excel?bulan='+b+'&token='+token); }
 function exportPegawaiExcel(){ window.open('/api/rekap/pegawai/excel?token='+token); }
 async function loadRekap(){ const b=document.getElementById('bulan').value; const rows=await api('/api/absensi/rekap?bulan='+b).then(r=>r.json()); document.getElementById('list-rekap').innerHTML=rows.map(r=>`<tr><td>${r.nama}</td><td>${r.hadir||0}</td><td>${r.telat||0}</td><td>${r.total_telat||0} mnt</td><td>${r.izin||0}</td><td>${r.sakit||0}</td></tr>`).join(''); }
-async function doAbsen(id,status){ const now=new Date(); const jam=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0'); const res=await api('/api/absensi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pegawai_id:id,tanggal:now.toISOString().slice(0,10),jam,status})}).then(r=>r.json()); toast(res.telat?`Hadir • Telat ${res.telat} menit`:`Absensi: ${status} • ${jam}`); loadAbsen(); }
+async function doAbsen(id,status){
+  let keterangan = '';
+  if (status === 'Izin' || status === 'Sakit') {
+    keterangan = (prompt('Masukkan keterangan absensi:') || '').trim();
+    if (!keterangan) { toast('Keterangan wajib diisi.'); return; }
+  }
+  const submit = async (location = {}) => {
+    const response = await api('/api/absensi', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pegawai_id: id, status, keterangan, ...location })
+    });
+    const result = await response.json();
+    if (!response.ok) { toast(result.error || 'Absensi gagal disimpan.'); return; }
+    toast(result.telat ? `Hadir • Telat ${result.telat} menit` : `Absensi ${status} • ${result.jam}`);
+    await loadAbsen();
+  };
+  if (status !== 'Hadir') return submit();
+  if (!navigator.geolocation) { toast('Browser tidak mendukung GPS.'); return; }
+  navigator.geolocation.getCurrentPosition(
+    position => submit({ lat: position.coords.latitude, lng: position.coords.longitude, accuracy: position.coords.accuracy }),
+    error => toast(error.code === 1 ? 'Izin lokasi ditolak. Aktifkan akses lokasi untuk absensi hadir.' : 'Lokasi GPS belum tersedia. Coba lagi di area terbuka.'),
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+  );
+}
 function exportExcel(){ const b=document.getElementById('bulan').value; window.open('/api/absensi/rekap/excel?bulan='+b); }
 async function submitSM(e){ e.preventDefault(); const fd=new FormData(e.target); await api('/api/surat-masuk',{method:'POST',body:fd}); toast('Surat masuk tersimpan!'); e.target.reset(); loadSM(); return false; }
 async function submitSK(e){ e.preventDefault(); const data=Object.fromEntries(new FormData(e.target).entries()); await api('/api/surat-keluar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}); toast('Surat keluar tersimpan!'); loadSK(); return false; }
@@ -624,18 +648,6 @@ function jarakMeter(lat1, lon1, lat2, lon2){
   const a = Math.sin(dLat/2)**2 + Math.cos(rad(lat1))*Math.cos(rad(lat2))*Math.sin(dLon/2)**2;
   return 2 * R * Math.asin(Math.sqrt(a));
 }
-function setSekolah(){
-  navigator.geolocation.getCurrentPosition(
-    pos => {
-      localStorage.setItem('sekolah', JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude }));
-      document.getElementById('sekolah-info').textContent = 'Tersimpan: ' + pos.coords.latitude.toFixed(5) + ', ' + pos.coords.longitude.toFixed(5);
-      toast('Titik sekolah tersimpan! Radius 300m aktif.');
-    },
-    () => toast('Gagal dapat lokasi. Pastikan GPS aktif & izinkan akses lokasi.'),
-    { timeout: 10000 }
-  );
-}
-
 // ===== LAPORAN BULANAN =====
 let divisiList = [];
 async function loadDivisi(){
