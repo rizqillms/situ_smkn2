@@ -525,6 +525,15 @@ function showModal(html){
   document.getElementById('modal-wrap').innerHTML = `<div style="position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)closeModal()"><div style="background:#fff;border-radius:16px;padding:22px;width:100%;max-width:520px;max-height:90vh;overflow:auto;">${html}</div></div>`;
 }
 function closeModal(){ document.getElementById('modal-wrap').innerHTML=''; }
+async function openUpload(filename){
+  const response = await api('/uploads/' + encodeURIComponent(filename));
+  if (!response.ok) { toast('File tidak dapat diakses. Silakan login ulang.'); return; }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const tab = window.open(url, '_blank', 'noopener');
+  if (!tab) { const link = document.createElement('a'); link.href = url; link.download = filename; link.click(); }
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
 function esc(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
 
 // ===== EDIT / HAPUS SURAT MASUK =====
@@ -679,8 +688,8 @@ async function loadLaporan(){
       <td>${esc(r.divisi)}</td>
       <td style="white-space:pre-line;font-size:.82rem;">${esc(r.kegiatan)}</td>
       <td style="font-size:.82rem;">Target: ${esc(r.target||'-')}<br>Realisasi: ${esc(r.realisasi||'-')}${r.kendala?`<br><span style="color:#b45309;">Kendala: ${esc(r.kendala)}</span>`:''}</td>
-      <td>${r.foto?`<a href="/uploads/${r.foto}" target="_blank" class="btn btn-small">Lihat</a>`:'-'}</td>
-      <td>${r.file_laporan?`<a href="/uploads/${r.file_laporan}" target="_blank" class="btn btn-small">Unduh</a>`:'-'}</td>
+      <td>${r.foto?`<button onclick="openUpload('${esc(r.foto)}')" class="btn btn-small">Lihat</button>`:'-'}</td>
+      <td>${r.file_laporan?`<button onclick="openUpload('${esc(r.file_laporan)}')" class="btn btn-small">Unduh</button>`:'-'}</td>
       <td><span class="badge ${r.status==='Sudah Dinilai'?'badge-hadir':'badge-izin'}">${esc(r.status)}</span></td>
       <td>${nilaiBox}</td>
     </tr>`;
