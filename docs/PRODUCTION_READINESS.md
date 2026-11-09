@@ -1,74 +1,67 @@
 # SITU SMKN 2 Rantau — Engineering & Production Readiness
 
-Dokumen ini menjadi baseline pengerjaan teknis. Perubahan dilakukan bertahap dan melalui pull request agar branch utama tetap aman.
-
-## Product objective
-
-Membangun sistem administrasi sekolah yang dapat diandalkan untuk pengarsipan surat, absensi pegawai, pengelolaan kepegawaian, laporan bulanan, rekap, dan pengelolaan akun.
+Dokumen ini menjadi catatan kerja teknis dan gerbang sebelum aplikasi digunakan pada lingkungan produksi. Semua perubahan runtime berada di branch hardening/phase-1; branch main dan database operasional tidak disentuh.
 
 ## Prinsip pengerjaan
-1. Jangan menghapus atau mengubah perilaku fitur yang sudah dipakai tanpa migrasi dan pengujian.
-2. Semua otorisasi wajib diperiksa di backend, bukan hanya dengan menyembunyikan menu di frontend.
-3. Validasi input dilakukan di server; data dari browser tidak dipercaya.
-4. Perubahan database harus kompatibel dengan data lama dan memiliki strategi backup/rollback.
-5. Rahasia, password awal, token, dan data pribadi tidak boleh ditanam di source code atau log.
-6. Setiap perubahan harus memiliki pengujian dan catatan perubahan.
+1. Tidak mengubah atau menghapus data operasional selama pengembangan.
+2. Otorisasi harus diperiksa di backend.
+3. Input browser tidak dipercaya; validasi dilakukan di server.
+4. Perubahan skema harus kompatibel dengan data lama dan punya backup/rollback.
+5. Database, unggahan, token, password, dan data pribadi tidak boleh masuk ke Git.
+6. Setiap perubahan harus memiliki pengujian yang dapat diulang.
 
-## Temuan awal dari snapshot kode yang tersedia
+## Implementasi yang sudah masuk branch
 
-### P0 — Wajib dibereskan sebelum data nyata digunakan
-- Password menggunakan SHA-256 dengan salt statis. Migrasikan ke Argon2id atau bcrypt dengan salt unik.
-- Akun demo dan password default ditanam di kode. Seed akun awal harus dikendalikan melalui environment/bootstrap satu kali, lalu wajib mengganti password.
-- Session memiliki kolom expiry tetapi pemeriksaan session yang terlihat belum memvalidasi expires_at.
-- Token diterima melalui query string. Token di URL berisiko masuk ke browser history, access log, dan referrer; gunakan header Authorization atau cookie HttpOnly/Secure/SameSite.
-- Absensi hanya memeriksa koordinat tersedia pada potongan kode yang ditinjau. Validasi radius sekolah harus dilakukan server-side dengan koordinat sekolah dari konfigurasi.
-- Upload file menggunakan konfigurasi Multer dasar. Batasi ukuran, tipe file, nama file, dan akses file; jangan sajikan dokumen sensitif sebagai file publik.
-- CORS dibuka untuk semua origin. Batasi ke origin aplikasi yang benar.
+### Autentikasi dan akses
+- Hash password baru memakai bcrypt dengan salt unik.
+- Hash SHA-256 lama diverifikasi dan ditingkatkan ke bcrypt setelah login berhasil.
+- Session diperiksa terhadap expires_at; token hanya diterima melalui header x-auth-token.
+- Password baru, reset, dan pembuatan akun mensyaratkan minimal 12 karakter.
+- Pembuatan admin pertama hanya melalui BOOTSTRAP_ADMIN_USERNAME dan BOOTSTRAP_ADMIN_PASSWORD saat tabel user kosong.
+- Seed akun demo dan pegawai contoh dihapus.
+- Percobaan login dibatasi sementara setelah kegagalan berulang.
+- Data pegawai dan absensi untuk role guru dibatasi ke pegawai yang terhubung.
+- Endpoint arsip dan file unggahan memerlukan autentikasi/role yang sesuai.
 
-### P1 — Keandalan dan operasional
-- Database SQLite dan folder upload berada di direktori aplikasi. Pastikan memakai persistent disk atau migrasikan ke PostgreSQL sebelum deploy yang menyimpan data penting.
-- Tambahkan backup terjadwal, uji restore, health check, dan penanganan error terpusat.
-- Tambahkan constraint/index database untuk relasi dan pencarian yang sering dipakai.
-- Validasi tanggal, status, role, ID, dan field wajib pada seluruh endpoint.
-- Pastikan aksi sensitif tercatat pada audit log tanpa merekam password, token, atau isi dokumen pribadi.
+### Absensi
+- Titik referensi resmi: -2.9317903, 115.1820055.
+- Radius resmi: 300 meter.
+- Server menghitung jarak, memvalidasi koordinat, dan menetapkan tanggal/jam berdasarkan Asia/Makassar.
+- Keterlambatan dihitung dari batas 08:00 WITA.
+- Keterangan Izin/Sakit wajib ada dan dimasukkan ke rekap bulanan serta export Excel.
+- Frontend meminta GPS hanya untuk status Hadir dan tidak lagi menyediakan tombol untuk mengubah titik sekolah.
+- Akurasi GPS diterima sebagai metadata, bukan disamakan dengan radius dan belum dipakai sebagai aturan penolakan.
 
-### P2 — Maintainability dan pengalaman pengguna
-- Pecah frontend satu-file menjadi modul yang jelas setelah baseline fitur dan pengujian tersedia.
-- Standarkan komponen form, tabel, modal, notifikasi, loading, empty state, dan error state.
-- Tambahkan pencarian, filter, pagination, dan tampilan responsif yang konsisten.
-- Sediakan dokumentasi setup lokal, konfigurasi environment, deployment, backup, dan pemulihan.
+### File dan operasional
+- Upload dibatasi maksimum 10 MB dan daftar ekstensi yang diizinkan.
+- File unggahan hanya dapat diakses dengan session aktif.
+- DATA_DIR memisahkan database dan file unggahan dari source code.
+- Backup menggunakan SQLite online backup dan mengemas database serta folder unggahan menjadi satu ZIP.
+- Endpoint health check tersedia di /healthz.
+- .gitignore dan .env.example disediakan.
+- Panduan deploy tidak lagi menyarankan filesystem ephemeral untuk data sekolah.
 
-## Tahapan pengerjaan
-### Phase 1 — Baseline dan security hardening
-- Inventarisasi seluruh endpoint, role matrix, tabel, upload, dan alur frontend.
-- Perbaiki autentikasi, expiry session, validasi input, CORS, upload, serta rate limiting login.
-- Implementasikan validasi absensi berbasis radius di backend setelah titik koordinat dan radius resmi sekolah dikonfirmasi.
-- Tambahkan test untuk login, role access, session expiry, dan absensi.
+### Otomatisasi pengujian
+GitHub Actions memeriksa sintaks backend, sintaks script frontend, startup dengan database sementara, autentikasi, pembatasan role, geofence, absensi ganda, keterangan rekap, dan pembuatan backup. Hasil terbaru yang telah selesai harus diperiksa lagi setelah commit berikutnya.
 
-### Phase 2 — Data integrity dan deployment
-- Migrasi database yang aman, indeks, constraint, persistent storage, backup, dan restore.
-- Health check, structured logging, konfigurasi environment, serta panduan deployment.
+## Gerbang yang masih wajib sebelum produksi
+- [ ] Jalankan uji browser/manual di beberapa perangkat HP dan browser sekolah.
+- [ ] Tinjau kebijakan akurasi GPS terpisah dari radius resmi 300 meter; jangan menolak hanya berdasarkan angka radius.
+- [ ] Audit final seluruh endpoint, role, dan kebocoran field pribadi.
+- [ ] Uji migrasi pada salinan database lama yang sudah disanitasi.
+- [ ] Buat backup dari database dan folder unggahan asli, verifikasi ZIP, dan lakukan restore test ke lokasi terpisah.
+- [ ] Rotasi seluruh akun/password demo yang mungkin sudah ada di database lama.
+- [ ] Tentukan persistent storage dan pemilik proses backup off-site.
+- [ ] Tetapkan kebijakan retensi dokumen/data dan persetujuan pengelola sekolah.
+- [ ] Uji cutover dan rollback sebelum domain produksi diarahkan.
 
-### Phase 3 — UX dan workflow
-- Perapihan dashboard, navigasi berbasis role, pencarian arsip, alur disposisi, approval laporan, dan notifikasi.
-- Uji alur kerja dengan perwakilan pengguna sekolah.
-
-### Phase 4 — Release readiness
-- Regression test seluruh fitur.
-- Uji keamanan dasar dan uji pemulihan backup.
-- Dokumentasi pengguna/admin, changelog, dan checklist go-live.
-
-## Informasi yang harus dikonfirmasi sebelum go-live
-- Koordinat resmi titik absensi sekolah dan radius yang disetujui.
-- Jam kerja, toleransi keterlambatan, kalender kerja, dan aturan izin/sakit.
-- Daftar role resmi beserta kewenangan masing-masing.
-- Kebijakan retensi dokumen dan data pegawai.
-- Domain produksi, origin frontend, lokasi penyimpanan permanen, serta penanggung jawab backup.
-- Apakah data pada deployment saat ini sudah berisi data nyata. Jangan menjalankan migrasi destruktif sebelum backup terverifikasi.
+## Batasan yang tidak boleh dilanggar
+Database dan folder unggahan operasional tetap berada di komputer pemilik. Jangan meminta atau memasukkan data asli ke repository. Jangan jalankan migrasi terhadap database aktif, reset, reseed, atau deployment produksi dari branch ini sebelum backup dan restore terverifikasi serta pengelola sekolah menyetujui.
 
 ## Status
-- [x] Membuat branch kerja terpisah: hardening/phase-1.
-- [x] Mencatat baseline risiko dan urutan pengerjaan.
-- [ ] Audit lengkap seluruh endpoint dan role matrix.
-- [ ] Implementasi hardening dan regression test.
-- [ ] Review pull request dan persetujuan sebelum merge.
+- [x] Branch kerja terpisah.
+- [x] Baseline risiko dan kebutuhan operasional dikonfirmasi.
+- [x] Hardening awal autentikasi, absensi, file, dan backup diterapkan.
+- [x] CI smoke test otomatis ditambahkan.
+- [ ] Regression test dan review akhir seluruh fitur.
+- [ ] Persetujuan sebelum merge dan go-live.
