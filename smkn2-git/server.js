@@ -637,6 +637,10 @@ app.get('/api/laporan/rekap', requireRole('admin','kasubag','kepsek','staff'), (
 // ========== IMPORT PEGAWAI (Excel/CSV) ==========
 app.post('/api/pegawai/import', requireRole('admin','kasubag'), upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'File tidak ada' });
+  if (path.extname(req.file.originalname || '').toLowerCase() !== '.xlsx') {
+    fs.promises.unlink(req.file.path).catch(() => {});
+    return res.status(400).json({ error: 'Import hanya mendukung file Excel .xlsx' });
+  }
   try {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.readFile(req.file.path);
@@ -680,7 +684,9 @@ app.post('/api/pegawai/import', requireRole('admin','kasubag'), upload.single('f
     log(req.user, 'Import Pegawai', `Import ${ok} pegawai dari Excel (${gagal} gagal)`);
     res.json({ ok: true, berhasil: ok, gagal });
   } catch(e) {
-    return res.status(400).json({ error: 'Gagal baca file: ' + e.message });
+    if (req.file && fs.existsSync(req.file.path)) fs.promises.unlink(req.file.path).catch(() => {});
+    console.error('Import pegawai gagal:', e.message);
+    return res.status(400).json({ error: 'Gagal membaca atau memproses file Excel.' });
   }
 });
 
