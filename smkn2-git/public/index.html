@@ -337,7 +337,7 @@
       <form onsubmit="return buatUser(event)">
         <div class="form-row">
           <div><label>Username (login)</label><input name="username" required placeholder="cth: budi"></div>
-          <div><label>Password (min. 6)</label><input name="password" required minlength="6" placeholder="cth: guru123"></div>
+          <div><label>Password (min. 12)</label><input name="password" required minlength="12" placeholder="minimal 12 karakter"></div>
         </div>
         <div class="form-row">
           <div><label>Nama Lengkap</label><input name="nama" required placeholder="cth: Budi Santoso, S.Pd"></div>
@@ -377,8 +377,8 @@
     <form onsubmit="return gantiPassword(event)">
       <label>Password Lama</label>
       <input type="password" name="lama" required style="margin-bottom:12px;">
-      <label>Password Baru (min. 6 karakter)</label>
-      <input type="password" name="baru" required minlength="6" style="margin-bottom:12px;">
+      <label>Password Baru (min. 12 karakter)</label>
+      <input type="password" name="baru" required minlength="12" style="margin-bottom:12px;">
       <label>Konfirmasi Password Baru</label>
       <input type="password" name="konfirmasi" required style="margin-bottom:16px;">
       <button class="btn" type="submit">Ganti Password</button>
@@ -731,7 +731,7 @@ async function buatUser(e){
   return false;
 }
 async function resetPass(id){
-  const pw = prompt('Password baru untuk akun ini (min. 6 karakter):');
+  const pw = prompt('Password baru untuk akun ini (min. 12 karakter):');
   if (!pw) return;
   const res = await api('/api/users/'+id+'/reset-password',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})}).then(r=>r.json());
   toast(res.ok ? 'Password berhasil direset!' : (res.error || 'Gagal reset'));
