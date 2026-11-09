@@ -10,3 +10,5 @@ services:
         value: 20.0.0
       - key: NODE_ENV
         value: production
+      - key: TRUST_PROXY_HOPS
+        value: 1
