@@ -359,7 +359,7 @@ app.get('/api/absensi', requireAuth, (req, res) => {
     SELECT p.nama, a.jam, a.status, a.telat_menit, a.keterangan FROM absensi a
     JOIN pegawai p ON p.id = a.pegawai_id
     WHERE a.tanggal = ? ORDER BY p.nama
-  `).all(tanggal || new Date().toISOString().slice(0,10));
+  `).all(tanggal || schoolDateTime().date);
   res.json(rows);
 });
 app.post('/api/absensi', requireAuth, (req, res) => {
@@ -404,6 +404,7 @@ app.get('/api/absensi/rekap', requireRole('admin','kasubag','kepsek','staff'), a
   const { bulan } = req.query;
   const rows = db.prepare(`
     SELECT p.nama,
+      GROUP_CONCAT(CASE WHEN a.keterangan IS NOT NULL AND TRIM(a.keterangan) <> '' THEN a.tanggal || ': ' || a.keterangan END, ' | ') as keterangan,
       SUM(CASE WHEN a.status='Hadir' THEN 1 ELSE 0 END) as hadir,
       SUM(CASE WHEN a.telat_menit>0 THEN 1 ELSE 0 END) as telat,
       SUM(a.telat_menit) as total_telat,
@@ -418,6 +419,7 @@ app.get('/api/absensi/rekap/excel', requireRole('admin','kasubag','kepsek','staf
   const { bulan } = req.query;
   const rows = db.prepare(`
     SELECT p.nama,
+      GROUP_CONCAT(CASE WHEN a.keterangan IS NOT NULL AND TRIM(a.keterangan) <> '' THEN a.tanggal || ': ' || a.keterangan END, ' | ') as keterangan,
       SUM(CASE WHEN a.status='Hadir' THEN 1 ELSE 0 END) as hadir,
       SUM(CASE WHEN a.telat_menit>0 THEN 1 ELSE 0 END) as telat,
       SUM(a.telat_menit) as total_telat,
@@ -430,6 +432,7 @@ app.get('/api/absensi/rekap/excel', requireRole('admin','kasubag','kepsek','staf
   const ws = wb.addWorksheet('Rekap');
   ws.columns = [
     { header: 'Nama', key: 'nama' },
+    { header: 'Keterangan Absensi', key: 'keterangan' },
     { header: 'Hadir', key: 'hadir' },
     { header: 'Telat', key: 'telat' },
     { header: 'Total Menit Telat', key: 'total_telat' },
@@ -644,16 +647,6 @@ app.get('/api/backup', requireRole('admin','kasubag'), (req, res) => {
   res.download(dest, `backup-smkn2-${stamp}.db`);
 });
 
-// Seed pegawai if empty
-const count = db.prepare('SELECT COUNT(*) as c FROM pegawai').get();
-if (count.c === 0) {
-  const seed = db.prepare('INSERT INTO pegawai (nama,nip,golongan,jabatan,status,masa_jabatan) VALUES (?,?,?,?,?,?)');
-  seed.run('Budi Santoso, S.Pd', '198501012010011001', 'III/a', 'Guru Matematika', 'PNS', '2010-2027');
-  seed.run('Siti Rahayu, M.Pd', '198702142012012002', 'III/b', 'Guru Bahasa Indonesia', 'PNS', '2012-2028');
-  seed.run('Ahmad Yani, S.Pd', '199003152015011003', 'III/a', 'Guru IPS', 'PNS', '2015-2029');
-  seed.run('Dewi Lestari, S.Pd', '199104202016012004', 'III/a', 'Kasubag TU', 'PNS', '2016-2030');
-  seed.run('Rudi Hermawan, S.Pd', '199205252017011005', 'II/c', 'Guru PJOK', 'PPPK', '2017-2029');
-  seed.run('Fitri Handayani, S.Pd', '199306302018012006', 'II/c', 'Staff TU', 'PPPK', '2018-2030');
-}
+// Demo personnel are intentionally not inserted into operational databases.
 
 app.listen(PORT, () => console.log(`SMKN 2 Rantau TU running on :${PORT}`));
