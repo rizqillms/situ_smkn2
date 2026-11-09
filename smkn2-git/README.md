@@ -27,4 +27,4 @@ Admin pertama hanya dibuat saat tabel users masih kosong dan kedua variable boot
 - Jangan commit file `.env`, database, uploads, atau backup.
 
 ## Sebelum produksi
-Aplikasi ini belum dinyatakan siap produksi. Jangan gunakan hosting dengan filesystem ephemeral untuk data operasional sekolah. Ikuti `../../docs/PRODUCTION_READINESS.md`, `../../docs/OPERATIONAL_DATA_SAFETY.md`, dan `PANDUAN-DEPLOY.md`. Lakukan backup dan restore test pada salinan data sebelum cutover; jangan mengunggah database operasional ke repository.
+Aplikasi ini belum dinyatakan siap produksi. Jangan gunakan hosting dengan filesystem ephemeral untuk data operasional sekolah. Ikuti `../docs/PRODUCTION_READINESS.md`, `../../docs/OPERATIONAL_DATA_SAFETY.md`, dan `PANDUAN-DEPLOY.md`. Lakukan backup dan restore test pada salinan data sebelum cutover; jangan mengunggah database operasional ke repository.
