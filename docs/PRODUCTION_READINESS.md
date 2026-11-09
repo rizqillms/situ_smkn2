@@ -30,7 +30,7 @@ Dokumen ini menjadi catatan kerja teknis dan gerbang sebelum aplikasi digunakan 
 - Keterlambatan dihitung dari batas 08:00 WITA.
 - Keterangan Izin/Sakit wajib ada dan dimasukkan ke rekap bulanan serta export Excel.
 - Frontend meminta GPS hanya untuk status Hadir dan tidak lagi menyediakan tombol untuk mengubah titik sekolah.
-- Akurasi GPS diterima sebagai metadata, bukan disamakan dengan radius dan belum dipakai sebagai aturan penolakan.
+- Akurasi GPS tetap diperlakukan sebagai isu teknis terpisah; saat ini tidak dipakai sebagai ambang penolakan maupun disimpan. Hanya koordinat yang dipakai untuk memeriksa geofence resmi.
 
 ### File dan operasional
 - Upload dibatasi maksimum 10 MB dan daftar ekstensi yang diizinkan.
