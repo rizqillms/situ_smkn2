@@ -225,6 +225,7 @@ const upload = multer({
     cb(null, true);
   }
 });
+app.use('/uploads', requireAuth, express.static(uploadsDir, { dotfiles: 'deny', index: false }));
 // ========== SURAT MASUK ==========
 app.get('/api/surat-masuk', requireAuth, (req, res) => {
   const rows = db.prepare('SELECT * FROM surat_masuk ORDER BY tanggal DESC').all();
