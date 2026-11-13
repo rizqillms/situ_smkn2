@@ -39,10 +39,39 @@ jobs:
           assert 'Dokumentasi kegiatan' in report, 'report documentation label should be present'
           assert 'name="foto"' not in report and 'image/*' not in report, 'report must not accept photo attachments'
           assert 'name="file_laporan"' in report and '.pdf' in report and '.xlsx' in report, 'PDF/Excel report documentation should be accepted'
+          app_js = Path('public/assets/app.js').read_text(encoding='utf-8')
+          assert "['dashboard', 'surat-masuk', 'surat-keluar', 'absensi', 'rekap', 'laporan']" in app_js, 'headmaster read-only pages should include letters, attendance recap and reports'
+          assert 'data-perm="suratWrite"' in html, 'letter create controls should be permission-gated'
+          assert 'data-perm="pegawaiRead"' in html, 'employee recap tab should remain role-restricted'
           print(f'Found {len(inline)} inline script(s) in index.html')
           PY
           for file in /tmp/situ-inline-*.js; do [ -e "$file" ] && node --check "$file"; done
           for file in public/assets/*.js; do node --check "$file"; done
+      - name: Verify production storage guard
+        run: |
+          guard_dir="$(mktemp -d)"
+          if NODE_ENV=production env -u DATA_DIR PORT=3211 node server.js > "$guard_dir/no-data-dir.log" 2>&1; then
+            echo "Production unexpectedly started without DATA_DIR"
+            exit 1
+          fi
+          grep -q "DATA_DIR wajib" "$guard_dir/no-data-dir.log"
+          NODE_ENV=production DATA_DIR="$guard_dir" ALLOW_EMPTY_DB_INIT=true BOOTSTRAP_ADMIN_USERNAME=ci-storage BOOTSTRAP_ADMIN_PASSWORD='ci-storage-password-2026' PORT=3211 node server.js > "$guard_dir/first-start.log" 2>&1 &
+          guard_pid=$!
+          trap 'kill "$guard_pid" 2>/dev/null || true; rm -rf "$guard_dir"' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3211/healthz; then break; fi
+            sleep 1
+          done
+          kill "$guard_pid"
+          wait "$guard_pid" || true
+          test -f "$guard_dir/.situ-storage-initialized"
+          rm -f "$guard_dir/data.db" "$guard_dir/data.db-wal" "$guard_dir/data.db-shm"
+          if NODE_ENV=production DATA_DIR="$guard_dir" PORT=3211 node server.js > "$guard_dir/missing-db.log" 2>&1; then
+            echo "Production unexpectedly recreated a missing initialized database"
+            exit 1
+          fi
+          grep -q "Database operasional hilang" "$guard_dir/missing-db.log"
+          rm -rf "$guard_dir"
       - name: Smoke test isolated startup and key workflows
         run: |
           tmpdir="$(mktemp -d)"
@@ -260,11 +289,25 @@ jobs:
                 const ownRows = await call('/api/absensi', 'GET', undefined, selfToken);
                 assert.equal(ownRows.response.status, 200);
                 assert.equal(ownRows.data.length, 1, 'headmaster attendance view is self-only');
-                assert.equal((await call('/api/surat-masuk', 'GET', undefined, selfToken)).response.status, 403);
-                assert.equal((await call('/api/surat-keluar', 'GET', undefined, selfToken)).response.status, 403);
+                assert.equal((await call('/api/surat-masuk', 'GET', undefined, selfToken)).response.status, 200, 'headmaster can read all incoming letters');
+                assert.equal((await call('/api/surat-keluar', 'GET', undefined, selfToken)).response.status, 200, 'headmaster can read all outgoing letters');
+                assert.equal((await call('/api/surat-keluar/' + outgoing.data.id + '/pdf', 'GET', undefined, selfToken)).response.status, 200, 'headmaster can view outgoing letter PDFs');
+                assert.equal((await call('/api/surat-masuk', 'POST', {
+                  nomor: 'CI-KEPSEK-BLOCK', tanggal: '2026-11-10', dari: 'CI', perihal: 'Read only'
+                }, selfToken)).response.status, 403, 'headmaster cannot create letters');
+                assert.equal((await call('/api/surat-keluar', 'POST', {
+                  tanggal: '2026-11-10', tujuan: 'CI', perihal: 'Read only', jenis: '400.3.8'
+                }, selfToken)).response.status, 403, 'headmaster cannot create outgoing letters');
+                assert.equal((await call('/api/rekap/surat?bulan=' + month, 'GET', undefined, selfToken)).response.status, 200, 'headmaster can view letter recaps');
+                assert.equal((await call('/api/rekap/surat/excel?bulan=' + month, 'GET', undefined, selfToken)).response.status, 200, 'headmaster can export letter recaps');
+                const attendanceRecap = await call('/api/absensi/rekap?bulan=' + month, 'GET', undefined, selfToken);
+                assert.equal(attendanceRecap.response.status, 200, 'headmaster can view all attendance recaps');
+                assert.ok(attendanceRecap.data.length > 1, 'headmaster attendance recap includes all employees');
+                assert.equal((await call('/api/absensi/rekap/excel?bulan=' + month, 'GET', undefined, selfToken)).response.status, 200, 'headmaster can export attendance recaps');
+                assert.equal((await call('/api/rekap/pegawai', 'GET', undefined, selfToken)).response.status, 403, 'headmaster cannot access employee personal recap');
                 assert.equal((await call('/api/log', 'GET', undefined, selfToken)).response.status, 403);
-                assert.equal((await call('/api/absensi/rekap?bulan=2026-11', 'GET', undefined, selfToken)).response.status, 403);
-                assert.equal((await call('/api/laporan?bulan=2026-11', 'GET', undefined, selfToken)).response.status, 200);
+                assert.equal((await call('/api/laporan?bulan=' + month, 'GET', undefined, selfToken)).response.status, 200, 'headmaster can read all monthly reports');
+                assert.equal((await call('/api/laporan/rekap?bulan=' + month, 'GET', undefined, selfToken)).response.status, 200, 'headmaster can read monthly report division recap');
                 const deniedReport = await call('/api/laporan', 'POST', {
                   pegawai_id: ownId, divisi: 'Administrasi Kesiswaan', bulan: '2026-11', kegiatan: 'CI'
                 }, selfToken);
