@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Sistem TU SMKN 2 Rantau - Arsip Surat, Absensi & Kepegawaian",
   "main": "server.js",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node server.js"
   },

@@ -374,16 +374,56 @@ app.post('/api/ganti-password', requireAuth, (req, res) => {
 // Upload config
 const uploadsDir = path.join(dataDir, 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+const uploadExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.csv'];
+const uploadMimeByExtension = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.webp': 'image/webp',
+  '.pdf': 'application/pdf',
+  '.doc': 'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.xls': 'application/vnd.ms-excel',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.csv': 'text/csv; charset=utf-8'
+};
 const upload = multer({
-  dest: uploadsDir,
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadsDir),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname || '').toLowerCase();
+      cb(null, crypto.randomBytes(16).toString('hex') + (uploadExtensions.includes(ext) ? ext : ''));
+    }
+  }),
   limits: { fileSize: 10 * 1024 * 1024, files: 2 },
   fileFilter(req, file, cb) {
     const ext = path.extname(file.originalname || '').toLowerCase();
-    const allowed = ['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.csv'];
-    if (!allowed.includes(ext)) return cb(new Error('Jenis file tidak diizinkan'));
+    if (!uploadExtensions.includes(ext)) return cb(new Error('Jenis file tidak diizinkan'));
     cb(null, true);
   }
 });
+function detectUploadMime(filePath, filename) {
+  const byExtension = uploadMimeByExtension[path.extname(filename).toLowerCase()];
+  if (byExtension) return byExtension;
+  let fd = null;
+  try {
+    fd = fs.openSync(filePath, 'r');
+    const buffer = Buffer.alloc(12);
+    const read = fs.readSync(fd, buffer, 0, buffer.length, 0);
+    const head = buffer.subarray(0, read);
+    if (head.subarray(0, 4).toString('latin1') === '%PDF') return 'application/pdf';
+    if (head[0] === 0x89 && head.subarray(1, 4).toString('latin1') === 'PNG') return 'image/png';
+    if (head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) return 'image/jpeg';
+    if (head.subarray(0, 4).toString('latin1') === 'RIFF' && head.subarray(8, 12).toString('latin1') === 'WEBP') return 'image/webp';
+  } catch (err) {
+    return 'application/octet-stream';
+  } finally {
+    if (fd !== null) {
+      try { fs.closeSync(fd); } catch (err) { /* abaikan */ }
+    }
+  }
+  return 'application/octet-stream';
+}
 function discardUpload(file) {
   if (file && file.path) fs.promises.unlink(file.path).catch(() => {});
 }
@@ -392,7 +432,26 @@ function removeStoredUpload(filename) {
   const target = path.join(uploadsDir, path.basename(String(filename)));
   fs.promises.unlink(target).catch(() => {});
 }
-app.use('/uploads', requireAuth, express.static(uploadsDir, { dotfiles: 'deny', index: false }));
+app.get('/uploads/:file', requireAuth, (req, res) => {
+  const filename = path.basename(String(req.params.file || ''));
+  if (!filename) return res.status(404).json({ error: 'Berkas tidak ditemukan' });
+  const target = path.join(uploadsDir, filename);
+  let stat = null;
+  try { stat = fs.statSync(target); } catch (err) { stat = null; }
+  if (!stat || !stat.isFile()) return res.status(404).json({ error: 'Berkas tidak ditemukan' });
+  const mime = detectUploadMime(target, filename);
+  const inline = mime === 'application/pdf' || mime.startsWith('image/');
+  res.setHeader('Content-Type', mime);
+  res.setHeader('Content-Length', stat.size);
+  res.setHeader('Content-Disposition', `${inline ? 'inline' : 'attachment'}; filename="${filename.replace(/"/g, '')}"`);
+  res.setHeader('Cache-Control', 'private, max-age=0');
+  const stream = fs.createReadStream(target);
+  stream.on('error', () => {
+    if (!res.headersSent) res.status(500).json({ error: 'Berkas tidak dapat dibaca' });
+    else res.destroy();
+  });
+  stream.pipe(res);
+});
 // ========== SURAT MASUK ==========
 app.get('/api/surat-masuk', requireRole('admin','kasubag','staff','kepsek'), (req, res) => {
   const rows = db.prepare('SELECT * FROM surat_masuk ORDER BY tanggal DESC').all();

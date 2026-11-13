@@ -136,6 +136,8 @@ jobs:
             assert.equal(anonymousFile.status, 401, 'uploaded files require authentication');
             const authorizedFile = await fetch(base + '/uploads/' + uploadedFile, { headers: { 'x-auth-token': admin } });
             assert.equal(authorizedFile.status, 200, 'authorized file download');
+            assert.match(uploadedFile, /\.pdf$/, 'uploaded file keeps its extension');
+            assert.ok((authorizedFile.headers.get('content-type') || '').includes('application/pdf'), 'uploaded PDF served with correct content type');
 
             const preview = await call('/api/surat-keluar/next-number?jenis=400.3.8&tahun=2026', 'GET', undefined, admin);
             assert.equal(preview.response.status, 200, 'letter number preview accessible');
