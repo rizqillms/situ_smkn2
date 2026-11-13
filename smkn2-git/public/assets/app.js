@@ -903,7 +903,8 @@
       body.innerHTML = state.pegawai.map((person) => {
         const row = recorded.get(Number(person.id));
         const isOwn = ownId && Number(person.id) === ownId;
-        const canAct = isToday && !row && (canRecordAll || (role === 'guru' && isOwn));
+        const canSelfRecord = ['guru', 'staff', 'kepsek'].includes(role) && isOwn;
+        const canAct = isToday && !row && (canRecordAll || canSelfRecord);
         let actions = '<span class="muted small">—</span>';
         if (canAct) {
           actions = `<div class="row-actions">
@@ -1325,8 +1326,8 @@
     if (button) button.disabled = true;
     try {
       await apiJson('/api/ganti-password', jsonOptions('POST', { lama: data.lama, baru: data.baru }));
-      toast('Kata sandi berhasil diperbarui.');
-      form.reset();
+      window.alert('Kata sandi berhasil diperbarui. Silakan masuk kembali menggunakan kata sandi baru.');
+      clearSession();
     } catch (error) { handleError(error); }
     finally { if (button) button.disabled = false; }
   }
