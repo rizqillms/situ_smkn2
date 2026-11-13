@@ -486,7 +486,7 @@ app.get('/uploads/:file', requireAuth, (req, res) => {
   stream.pipe(res);
 });
 // ========== SURAT MASUK ==========
-app.get('/api/surat-masuk', requireRole('admin','kasubag','staff','kepsek'), (req, res) => {
+app.get('/api/surat-masuk', requireRole('admin','kasubag','staff'), (req, res) => {
   const rows = db.prepare('SELECT * FROM surat_masuk ORDER BY tanggal DESC').all();
   res.json(rows);
 });
@@ -528,7 +528,7 @@ app.delete('/api/surat-masuk/:id', requireRole('admin','kasubag','staff'), (req,
 });
 
 // ========== SURAT KELUAR ==========
-app.get('/api/surat-keluar', requireRole('admin','kasubag','staff','kepsek'), (req, res) => {
+app.get('/api/surat-keluar', requireRole('admin','kasubag','staff'), (req, res) => {
   const rows = db.prepare('SELECT * FROM surat_keluar ORDER BY tanggal DESC').all();
   res.json(rows);
 });
@@ -580,7 +580,7 @@ app.delete('/api/surat-keluar/:id', requireRole('admin','kasubag','staff'), (req
   log(req.user, 'Surat Keluar', `Hapus surat ${row.nomor || ''}`);
   res.json({ ok: true });
 });
-app.get('/api/surat-keluar/:id/pdf', requireRole('admin','kasubag','staff','kepsek'), (req, res) => {
+app.get('/api/surat-keluar/:id/pdf', requireRole('admin','kasubag','staff'), (req, res) => {
   const s = db.prepare('SELECT * FROM surat_keluar WHERE id=?').get(req.params.id);
   if (!s) return res.status(404).send('Not found');
   const nomor = cleanText(s.nomor, 120) || `surat-${s.id}`;
@@ -611,9 +611,22 @@ app.get('/api/surat-keluar/:id/pdf', requireRole('admin','kasubag','staff','keps
   doc.end();
 });
 
+// ========== DASHBOARD SUMMARY ==========
+app.get('/api/dashboard/summary', requireAuth, (req, res) => {
+  const tanggal = schoolDateTime().date;
+  const totalPegawai = db.prepare('SELECT COUNT(*) as total FROM pegawai').get().total;
+  const attendance = db.prepare(`
+    SELECT
+      SUM(CASE WHEN status='Hadir' THEN 1 ELSE 0 END) as hadir,
+      SUM(CASE WHEN telat_menit>0 THEN 1 ELSE 0 END) as telat
+    FROM absensi WHERE tanggal=?
+  `).get(tanggal);
+  res.json({ totalPegawai, hadir: Number(attendance.hadir || 0), telat: Number(attendance.telat || 0) });
+});
+
 // ========== PEGAWAI ==========
 app.get('/api/pegawai', requireAuth, (req, res) => {
-  if (req.user.role === 'guru') {
+  if (req.user.role === 'guru' || req.user.role === 'kepsek') {
     const rows = db.prepare('SELECT id, nama, jenis_pegawai, status, jabatan FROM pegawai WHERE id=?').all(req.user.pegawai_id || 0);
     return res.json(rows);
   }
@@ -666,7 +679,7 @@ app.delete('/api/pegawai/:id', requireRole('admin','kasubag'), (req, res) => {
   log(req.user, 'Pegawai', `Hapus pegawai ${row.nama}`);
   res.json({ ok: true, laporan_dihapus: reports.length });
 });
-app.get('/api/pegawai/notifikasi', requireRole('admin','kasubag','kepsek'), (req, res) => {
+app.get('/api/pegawai/notifikasi', requireRole('admin','kasubag'), (req, res) => {
   const rows = db.prepare("SELECT * FROM pegawai WHERE COALESCE(NULLIF(jenis_pegawai,''), status) = 'PNS'").all();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -702,7 +715,7 @@ app.get('/api/pegawai/notifikasi', requireRole('admin','kasubag','kepsek'), (req
 app.get('/api/absensi', requireAuth, (req, res) => {
   const tanggal = req.query.tanggal || schoolDateTime().date;
   let rows;
-  if (req.user.role === 'guru') {
+  if (req.user.role === 'guru' || req.user.role === 'kepsek') {
     rows = db.prepare(`
       SELECT a.pegawai_id, p.nama, a.jam, a.status, a.telat_menit, a.keterangan FROM absensi a
       JOIN pegawai p ON p.id = a.pegawai_id
@@ -762,7 +775,7 @@ app.post('/api/absensi', requireAuth, (req, res) => {
   res.json({ ok: true, tanggal: now.date, jam: now.time, telat: lateMinutes,
     jarak_meter: distance === null ? null : Math.round(distance) });
 });
-app.get('/api/absensi/rekap', requireRole('admin','kasubag','kepsek','staff'), async (req, res) => {
+app.get('/api/absensi/rekap', requireRole('admin','kasubag','staff'), async (req, res) => {
   const { bulan } = req.query;
   const rows = db.prepare(`
     SELECT p.nama,
@@ -777,7 +790,7 @@ app.get('/api/absensi/rekap', requireRole('admin','kasubag','kepsek','staff'), a
   `).all(bulan + '%');
   res.json(rows);
 });
-app.get('/api/absensi/rekap/excel', requireRole('admin','kasubag','kepsek','staff'), async (req, res) => {
+app.get('/api/absensi/rekap/excel', requireRole('admin','kasubag','staff'), async (req, res) => {
   const { bulan } = req.query;
   const rows = db.prepare(`
     SELECT p.nama,
@@ -809,7 +822,7 @@ app.get('/api/absensi/rekap/excel', requireRole('admin','kasubag','kepsek','staf
 });
 
 // ========== REKAP SURAT ==========
-app.get('/api/rekap/surat', requireRole('admin','kasubag','kepsek','staff'), (req, res) => {
+app.get('/api/rekap/surat', requireRole('admin','kasubag','staff'), (req, res) => {
   const { bulan } = req.query;
   const sm = db.prepare("SELECT COUNT(*) as total, dari, perihal, tanggal FROM surat_masuk WHERE tanggal LIKE ? GROUP BY dari ORDER BY tanggal DESC").all(bulan + '%');
   const sk = db.prepare("SELECT COUNT(*) as total, tujuan, perihal, tanggal FROM surat_keluar WHERE tanggal LIKE ? GROUP BY tujuan ORDER BY tanggal DESC").all(bulan + '%');
@@ -817,7 +830,7 @@ app.get('/api/rekap/surat', requireRole('admin','kasubag','kepsek','staff'), (re
   const totalKeluar = db.prepare("SELECT COUNT(*) as c FROM surat_keluar WHERE tanggal LIKE ?").get(bulan + '%');
   res.json({ totalMasuk: totalMasuk.c, totalKeluar: totalKeluar.c, masukRinci: sm, keluarRinci: sk });
 });
-app.get('/api/rekap/surat/excel', requireRole('admin','kasubag','kepsek','staff'), async (req, res) => {
+app.get('/api/rekap/surat/excel', requireRole('admin','kasubag','staff'), async (req, res) => {
   const { bulan } = req.query;
   const sm = db.prepare("SELECT nomor, tanggal, dari, perihal FROM surat_masuk WHERE tanggal LIKE ? ORDER BY tanggal").all(bulan + '%');
   const sk = db.prepare("SELECT nomor, tanggal, tujuan, perihal FROM surat_keluar WHERE tanggal LIKE ? ORDER BY tanggal").all(bulan + '%');
@@ -835,7 +848,7 @@ app.get('/api/rekap/surat/excel', requireRole('admin','kasubag','kepsek','staff'
 });
 
 // ========== REKAP PEGAWAI ==========
-app.get('/api/rekap/pegawai', requireRole('admin','kasubag','kepsek','staff'), (req, res) => {
+app.get('/api/rekap/pegawai', requireRole('admin','kasubag','staff'), (req, res) => {
   const total = db.prepare('SELECT COUNT(*) as c FROM pegawai').get();
   const perStatus = db.prepare("SELECT COALESCE(NULLIF(jenis_pegawai,''), status) as status, COUNT(*) as c FROM pegawai GROUP BY status").all();
   const perGolongan = db.prepare('SELECT golongan, COUNT(*) as c FROM pegawai WHERE golongan IS NOT NULL AND length(golongan) > 0 GROUP BY golongan ORDER BY golongan').all();
@@ -843,7 +856,7 @@ app.get('/api/rekap/pegawai', requireRole('admin','kasubag','kepsek','staff'), (
   const semua = db.prepare("SELECT id, nama, jenis_kelamin, nip, tempat_lahir, tanggal_lahir, golongan, jabatan, COALESCE(NULLIF(jenis_pegawai,''), status) as jenis, agama, pendidikan, no_hp, alamat, periode_tahun, periode_bulan, tanggal_naik_pangkat FROM pegawai ORDER BY nama").all();
   res.json({ total: total.c, perStatus, perGolongan, perJabatan, semua });
 });
-app.get('/api/rekap/pegawai/excel', requireRole('admin','kasubag','kepsek','staff'), async (req, res) => {
+app.get('/api/rekap/pegawai/excel', requireRole('admin','kasubag','staff'), async (req, res) => {
   const rows = db.prepare("SELECT nama, jenis_kelamin, tempat_lahir, tanggal_lahir, nip, COALESCE(NULLIF(jenis_pegawai,''), status) as status, jabatan, agama, pendidikan, no_hp, alamat, golongan, periode_tahun, periode_bulan, tanggal_naik_pangkat FROM pegawai ORDER BY nama").all();
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('Pegawai');
@@ -932,7 +945,7 @@ app.get('/api/laporan', requireAuth, (req, res) => {
   }
   res.json(rows);
 });
-app.post('/api/laporan', requireAuth, upload.fields([{name:'foto',maxCount:1},{name:'file_laporan',maxCount:1}]), validateUploadedFiles, (req, res) => {
+app.post('/api/laporan', requireAuth, upload.fields([{name:'file_laporan',maxCount:1}]), validateUploadedFiles, (req, res) => {
   const pegawaiId = Number(req.body.pegawai_id);
   const divisi = cleanText(req.body.divisi, 120);
   const bulan = cleanText(req.body.bulan, 7);
@@ -942,10 +955,8 @@ app.post('/api/laporan', requireAuth, upload.fields([{name:'foto',maxCount:1},{n
   const kendala = optionalText(req.body.kendala, 2000);
   const catatan = optionalText(req.body.catatan, 2000);
   const uploaded = req.files || {};
-  const fotoFile = uploaded.foto && uploaded.foto[0];
   const laporanFile = uploaded.file_laporan && uploaded.file_laporan[0];
   const reject = (message, status = 400) => {
-    discardUpload(fotoFile);
     discardUpload(laporanFile);
     return res.status(status).json({ error: message });
   };
@@ -955,22 +966,25 @@ app.post('/api/laporan', requireAuth, upload.fields([{name:'foto',maxCount:1},{n
   if (!/^\d{4}-\d{2}$/.test(bulan)) return reject('Bulan laporan tidak valid.');
   if (!DIVISI.includes(divisi)) return reject('Divisi laporan tidak valid.');
   if (!kegiatan) return reject('Uraian kegiatan wajib diisi.');
+  if (req.user.role === 'kepsek') return reject('Akun Kepala Sekolah hanya memiliki akses baca pada laporan.', 403);
   if (req.user.role !== 'admin' && req.user.role !== 'kasubag' && req.user.pegawai_id !== pegawaiId) {
     return reject('Hanya dapat mengirim laporan untuk diri sendiri.', 403);
   }
-  const foto = fotoFile ? fotoFile.filename : null;
+  const extension = laporanFile ? path.extname(laporanFile.originalname || '').toLowerCase() : '';
+  if (laporanFile && !['.pdf', '.xls', '.xlsx'].includes(extension)) {
+    return reject('Dokumentasi kegiatan hanya boleh berupa PDF atau Excel (.xls/.xlsx).');
+  }
   const file_laporan = laporanFile ? laporanFile.filename : null;
-  const existing = db.prepare('SELECT id, foto, file_laporan FROM laporan_bulanan WHERE pegawai_id=? AND bulan=?').get(pegawaiId, bulan);
+  const existing = db.prepare('SELECT id, file_laporan FROM laporan_bulanan WHERE pegawai_id=? AND bulan=?').get(pegawaiId, bulan);
   if (existing) {
-    db.prepare('UPDATE laporan_bulanan SET divisi=?, kegiatan=?, target=?, realisasi=?, kendala=?, catatan=?, foto=IFNULL(?,foto), file_laporan=IFNULL(?,file_laporan), status=? WHERE id=?')
-      .run(divisi, kegiatan, target, realisasi, kendala, catatan, foto, file_laporan, 'Belum Dinilai', existing.id);
-    if (foto) removeStoredUpload(existing.foto);
+    db.prepare('UPDATE laporan_bulanan SET divisi=?, kegiatan=?, target=?, realisasi=?, kendala=?, catatan=?, file_laporan=IFNULL(?,file_laporan), status=? WHERE id=?')
+      .run(divisi, kegiatan, target, realisasi, kendala, catatan, file_laporan, 'Belum Dinilai', existing.id);
     if (file_laporan) removeStoredUpload(existing.file_laporan);
     log(req.user, 'Laporan', `Update laporan ${bulan} (${divisi})`);
     return res.json({ ok: true, id: existing.id, updated: true });
   }
   const info = db.prepare('INSERT INTO laporan_bulanan (pegawai_id,divisi,bulan,kegiatan,target,realisasi,kendala,catatan,foto,file_laporan) VALUES (?,?,?,?,?,?,?,?,?,?)')
-    .run(pegawaiId, divisi, bulan, kegiatan, target, realisasi, kendala, catatan, foto, file_laporan);
+    .run(pegawaiId, divisi, bulan, kegiatan, target, realisasi, kendala, catatan, null, file_laporan);
   log(req.user, 'Laporan', `Upload laporan ${bulan} (${divisi})`);
   res.json({ ok: true, id: info.lastInsertRowid });
 });
@@ -1241,7 +1255,7 @@ app.post('/api/pegawai/import', requireRole('admin','kasubag'), upload.single('f
 });
 
 // ========== ACTIVITY LOG (existing anchor) ==========
-app.get('/api/log', requireRole('admin','kasubag','kepsek'), (req, res) => {
+app.get('/api/log', requireRole('admin','kasubag'), (req, res) => {
   const rows = db.prepare('SELECT * FROM activity_log ORDER BY created_at DESC LIMIT 100').all();
   res.json(rows);
 });
