@@ -33,6 +33,12 @@ jobs:
           inline = [s for s in scripts if s.strip()]
           for i, script in enumerate(inline, 1):
               Path(f'/tmp/situ-inline-{i}.js').write_text(script, encoding='utf-8')
+          assert 'Lewati navigasi' not in html, 'skip navigation control should be absent'
+          assert 'id="absen-form"' in html, 'dedicated attendance form should exist'
+          report = html.split('id="laporan"', 1)[1].split('</section>', 1)[0]
+          assert 'Dokumentasi kegiatan' in report, 'report documentation label should be present'
+          assert 'name="foto"' not in report and 'image/*' not in report, 'report must not accept photo attachments'
+          assert 'name="file_laporan"' in report and '.pdf' in report and '.xlsx' in report, 'PDF/Excel report documentation should be accepted'
           print(f'Found {len(inline)} inline script(s) in index.html')
           PY
           for file in /tmp/situ-inline-*.js; do [ -e "$file" ] && node --check "$file"; done
