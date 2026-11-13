@@ -416,7 +416,7 @@ function detectUploadMime(filePath, filename) {
   try { buffer = fs.readFileSync(filePath); } catch (err) { return 'application/octet-stream'; }
   const head = buffer.subarray(0, 16);
   const ext = path.extname(filename).toLowerCase();
-  if (head.subarray(0, 4).toString('latin1') === '%PDF-') return 'application/pdf';
+  if (head.subarray(0, 5).toString('latin1') === '%PDF-') return 'application/pdf';
   if (head[0] === 0x89 && head.subarray(1, 4).toString('latin1') === 'PNG' && head.subarray(4, 8).equals(Buffer.from([0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
   if (head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) return 'image/jpeg';
   if (head.subarray(0, 4).toString('latin1') === 'RIFF' && head.subarray(8, 12).toString('latin1') === 'WEBP') return 'image/webp';
