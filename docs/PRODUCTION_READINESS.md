@@ -1,6 +1,6 @@
 # SITU SMKN 2 Rantau — Engineering & Production Readiness
 
-Dokumen ini menjadi catatan kerja teknis dan gerbang sebelum aplikasi digunakan pada lingkungan produksi. Semua perubahan runtime berada di branch hardening/phase-1; branch main dan database operasional tidak disentuh.
+Dokumen ini menjadi catatan kerja teknis dan gerbang sebelum aplikasi digunakan pada lingkungan produksi. Perubahan runtime berada di branch kerja terpisah (`hardening/phase-1`, `fix/priority-pass-1`); branch main dan database operasional tidak disentuh.
 
 ## Prinsip pengerjaan
 1. Tidak mengubah atau menghapus data operasional selama pengembangan.
@@ -44,7 +44,7 @@ Dokumen ini menjadi catatan kerja teknis dan gerbang sebelum aplikasi digunakan 
 - Panduan deploy tidak lagi menyarankan filesystem ephemeral untuk data sekolah.
 
 ### Otomatisasi pengujian
-GitHub Actions memeriksa sintaks backend, sintaks script frontend, startup dengan database sementara, autentikasi, pembatasan role, geofence, absensi ganda, keterangan rekap, dan pembuatan backup. Hasil terbaru yang telah selesai harus diperiksa lagi setelah commit berikutnya.
+GitHub Actions memeriksa sintaks backend dan seluruh script frontend, startup dengan database sementara, autentikasi, pembatasan role, geofence, absensi ganda, keterangan rekap, unggah/unduh berkas, penomoran surat keluar dan PDF, pengingat kenaikan pangkat, template serta import Excel, pembuatan akun, pembuatan backup, dan restore database + berkas unggahan dari ZIP. Alur CI dapat dijalankan lokal dengan mengekstrak langkah `run` dari `.github/workflows/situ-ci.yml`. Hasil terbaru yang telah selesai harus diperiksa lagi setelah commit berikutnya.
 
 ## Gerbang yang masih wajib sebelum produksi
 - [ ] Jalankan uji browser/manual di beberapa perangkat HP dan browser sekolah.
@@ -65,5 +65,6 @@ Database dan folder unggahan operasional tetap berada di komputer pemilik. Janga
 - [x] Baseline risiko dan kebutuhan operasional dikonfirmasi.
 - [x] Hardening awal autentikasi, absensi, file, dan backup diterapkan.
 - [x] CI smoke test otomatis ditambahkan.
+- [x] Perbaikan prioritas: pemulihan data absensi, pengingat pangkat termasuk yang terlewat, import/template Excel, penomoran surat server-side, pembatasan menu per peran, dan pembaruan antarmuka desktop/mobile.
 - [ ] Regression test dan review akhir seluruh fitur.
 - [ ] Persetujuan sebelum merge dan go-live.

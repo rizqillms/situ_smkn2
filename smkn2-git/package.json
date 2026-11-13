@@ -3,17 +3,20 @@
   "version": "1.0.0",
   "description": "Sistem TU SMKN 2 Rantau - Arsip Surat, Absensi & Kepegawaian",
   "main": "server.js",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "better-sqlite3": "^9.4.3",
-    "multer": "^2.5.0",
-    "pdfkit": "^0.14.0",
-    "exceljs": "^4.4.0",
+    "archiver": "^5.3.2",
     "bcryptjs": "^2.4.3",
-    "archiver": "^5.3.2"
+    "better-sqlite3": "^9.4.3",
+    "dotenv": "^16.6.1",
+    "exceljs": "^4.4.0",
+    "express": "^4.18.2",
+    "multer": "^2.5.0",
+    "pdfkit": "^0.14.0"
   }
 }

@@ -9,6 +9,16 @@ Dokumen ini memisahkan pekerjaan UI/UX yang dikerjakan pada Phase 2 dari pekerja
 - Perbaikan penanda menu aktif agar tetap benar saat section dibuka dari tombol aksi cepat, bukan hanya dari menu navigasi.
 - Penambahan skip link, label navigasi, fokus keyboard yang terlihat, dan dukungan reduced-motion.
 
+## Penyempurnaan prioritas (lanjutan)
+- Antarmuka ditulis ulang dengan palet navy–ivory–emerald, tipografi IBM Plex, sidebar desktop, drawer ponsel, tabel yang dapat digulir, serta modal dan notifikasi internal.
+- Absensi kembali memuat data pegawai dan catatan kehadiran sekaligus, lengkap dengan ringkasan hadir, terlambat, dan belum tercatat.
+- Pengingat kenaikan pangkat mencakup jadwal 150 hari ke depan dan data yang sudah terlewat hingga satu tahun.
+- Import pegawai memakai template resmi, deteksi baris header otomatis, dan deduplikasi berdasarkan NIP atau nama dan tanggal lahir.
+- Nomor surat keluar ditetapkan server-side per jenis dan tahun; pratinjau nomor tersedia sebelum surat disimpan.
+- Menu dan aksi dibatasi sesuai peran; data pegawai memakai satu form untuk tambah dan edit, dengan kolom non-PNS dinonaktifkan.
+- Halaman login dua kolom dengan validasi, tombol tampilkan sandi, dan status pemuatan; CSP tidak lagi mengizinkan script inline.
+- Konfigurasi deploy memakai persistent disk, health check, dan Node 20.
+
 ## Catatan verifikasi UI
 1. Uji seluruh menu dengan akun tiap role: Dashboard, Surat Masuk, Surat Keluar, Absensi, Kepegawaian, Rekap, Laporan Bulanan, Log Aktivitas, Profil, dan Pengguna.
 2. Uji tampilan pada lebar 360px, 390px, 768px, 1024px, dan desktop.
