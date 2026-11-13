@@ -1,306 +1,85 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login — Sistem TU SMKN 2 Rantau</title>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
-      --card: rgba(30, 41, 59, 0.8);
-      --primary: #1d4ed8;
-      --primary-hover: #1e40af;
-      --accent: #38bdf8;
-      --text: #f8fafc;
-      --muted: #94a3b8;
-      --border: rgba(147, 197, 253, 0.2);
-      --radius: 16px;
-      --shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
-    }
-
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-      min-height: 100vh;
-      background: var(--bg);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-      overflow-x: hidden;
-    }
-
-    .login-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 40px 32px;
-      width: 100%;
-      max-width: 420px;
-      box-shadow: var(--shadow);
-      position: relative;
-      overflow: hidden;
-      transition: transform 0.3s ease;
-    }
-
-    .login-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 4px;
-      background: linear-gradient(90deg, #3b82f6, #1d4ed8);
-    }
-
-    .login-card:hover {
-      transform: translateY(-2px);
-    }
-
-    .logo {
-      width: 72px;
-      height: 72px;
-      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-      border-radius: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto 24px;
-      font-size: 36px;
-      color: white;
-      font-weight: 800;
-      box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
-    }
-
-    h1 {
-      text-align: center;
-      font-size: 1.6rem;
-      color: var(--text);
-      margin-bottom: 8px;
-      font-weight: 700;
-    }
-
-    .sub {
-      text-align: center;
-      color: var(--muted);
-      font-size: 0.88rem;
-      margin: 6px 0 28px;
-    }
-
-    .form-group {
-      margin-bottom: 20px;
-    }
-
-    label {
-      font-size: 0.82rem;
-      font-weight: 600;
-      color: var(--muted);
-      display: block;
-      margin-bottom: 8px;
-    }
-
-    input {
-      width: 100%;
-      padding: 14px 16px;
-      border: 1.5px solid rgba(147, 197, 253, 0.3);
-      border-radius: 12px;
-      font-size: 0.95rem;
-      font-family: inherit;
-      background: rgba(30, 41, 59, 0.5);
-      color: var(--text);
-      transition: border-color 0.2s, box-shadow 0.2s;
-    }
-
-    input::placeholder {
-      color: rgba(147, 197, 253, 0.5);
-    }
-
-    input:focus {
-      outline: none;
-      border-color: #3b82f6;
-      box-shadow: 0 0 0 4px rgba(59, 130, 253, 0.15);
-    }
-
-    input:focus::placeholder {
-      color: transparent;
-    }
-
-    .btn {
-      width: 100%;
-      background: var(--primary);
-      color: white;
-      border: none;
-      padding: 14px 24px;
-      border-radius: 12px;
-      font-size: 1rem;
-      font-weight: 700;
-      font-family: inherit;
-      cursor: pointer;
-      margin-top: 16px;
-      transition: background 0.2s, transform 0.1s;
-    }
-
-    .btn:hover {
-      background: var(--primary-hover);
-      transform: translateY(-1px);
-    }
-
-    .btn:active {
-      transform: translateY(0);
-    }
-
-    .error {
-      background: rgba(239, 68, 68, 0.15);
-      border: 1px solid rgba(239, 68, 68, 0.3);
-      color: #f87171;
-      padding: 12px 16px;
-      border-radius: 10px;
-      font-size: 0.85rem;
-      margin-bottom: 20px;
-      display: none;
-      text-align: center;
-    }
-
-    .error.show {
-      display: block;
-      animation: shake 0.4s ease;
-    }
-
-    @keyframes shake {
-      0%, 100% { transform: translateX(0); }
-      20% { transform: translateX(-8px); }
-      40% { transform: translateX(8px); }
-      60% { transform: translateX(-8px); }
-      80% { transform: translateX(8px); }
-    }
-
-    .hint {
-      margin-top: 24px;
-      background: rgba(15, 23, 42, 0.3);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 20px;
-      font-size: 0.78rem;
-      color: var(--muted);
-      line-height: 1.8;
-      text-align: center;
-    }
-
-    .hint b {
-      color: #60a5fa;
-    }
-
-    .divider {
-      height: 1px;
-      background: rgba(147, 197, 253, 0.2);
-      margin: 20px 0;
-    }
-
-    .links {
-      margin-top: 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      align-items: center;
-    }
-
-    .links a {
-      color: var(--accent);
-      text-decoration: none;
-      font-size: 0.82rem;
-      font-weight: 500;
-      transition: color 0.2s;
-    }
-
-    .links a:hover {
-      color: #67e8f9;
-    }
-
-    @media (max-width: 420px) {
-      .login-card {
-        margin: 20px;
-        padding: 32px 24px;
-      }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#16273f">
+<meta name="description" content="Masuk ke Sistem Informasi Tata Usaha SMK Negeri 2 Rantau.">
+<title>Masuk · SITU SMK Negeri 2 Rantau</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&display=swap" rel="stylesheet">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/components.css">
 </head>
 <body>
-  <div class="login-card" id="loginCard">
-    <div class="logo">🎓</div>
+<svg width="0" height="0" class="sr-only" aria-hidden="true" focusable="false">
+  <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v5c0 4.6 3 8 7 10 4-2 7-5.4 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.2 4.2L19 7"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2.8 20h18.4L12 3Z"/><path d="M12 9v5"/><path d="M12 17.2v.1"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 6.1A10.9 10.9 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-2.5 3.4"/><path d="M6.3 6.3A17 17 0 0 0 2.5 12S6 18 12 18a10 10 0 0 0 4.1-.8"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m14 7 5 5-5 5"/></symbol>
+</svg>
 
-    <h1>SMKN 2 Rantau</h1>
-    <p class="sub">Sistem Informasi Tata Usaha<br>Silakan login untuk melanjutkan</p>
-
-    <div class="error" id="err"></div>
-
-    <form onsubmit="return doLogin(event)">
-      <div class="form-group">
-        <label>Username</label>
-        <input id="username" placeholder="Contoh: kasubag" required autocomplete="username">
-      </div>
-      <div class="form-group">
-        <label>Password</label>
-        <input id="password" type="password" required autocomplete="current-password">
-      </div>
-
-      <button class="btn" type="submit">Masuk →</button>
-    </form>
-
-    <div class="divider"></div>
-
-    <div class="hint">
-      <b>Catatan:</b> Password minimal 12 karakter. Username sesuai role Anda (<span>admin / kasubag / guru / staff / kepsek</span>).
+<div class="login-page">
+  <aside class="login-brand">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">2</div>
+      <div class="brand-text"><strong>SMK Negeri 2 Rantau</strong><span>Tata Usaha</span></div>
     </div>
 
-    <div class="links">
-      <a href="#" onclick="document.getElementById('username').focus(); return false;">Lupa password?</a>
-      <a href="#" onclick="document.getElementById('password').focus(); return false;">Reset</a>
+    <div class="login-copy">
+      <span class="kicker">Sistem Informasi Tata Usaha</span>
+      <h1>Administrasi sekolah, lebih tertata.</h1>
+      <p>Satu tempat untuk pengelolaan surat, kehadiran pegawai, data kepegawaian, dan laporan kinerja tata usaha.</p>
+      <div class="login-points">
+        <span><svg><use href="#i-shield"/></svg>Akses dibatasi sesuai peran pengguna</span>
+        <span><svg><use href="#i-check"/></svg>Data tersimpan pada basis data sekolah</span>
+        <span><svg><use href="#i-check"/></svg>Arsip surat dan laporan terpusat</span>
+      </div>
     </div>
-  </div>
 
-  <script>
-    async function doLogin(e) {
-      e.preventDefault();
-      const username = document.getElementById('username').value.trim();
-      const password = document.getElementById('password').value;
-      const res = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
-      const data = await res.json();
+    <div class="login-foot">SMK Negeri 2 Rantau · Kabupaten Tapin, Kalimantan Selatan</div>
+  </aside>
 
-      if (!res.ok) {
-        showError(data.error || 'Username atau password salah');
-        return false;
-      }
+  <main class="login-panel">
+    <div class="login-form-wrap">
+      <span class="kicker">Akses terbatas</span>
+      <h2>Masuk ke akun Anda</h2>
+      <p>Gunakan akun yang diberikan oleh administrator atau kasubag tata usaha.</p>
 
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-      window.location.href = '/';
-      return false;
-    }
+      <div class="login-alert" id="login-alert" role="alert" aria-live="assertive">
+        <svg><use href="#i-alert"/></svg><span id="login-alert-text"></span>
+      </div>
 
-    function showError(msg) {
-      const err = document.getElementById('err');
-      err.textContent = msg;
-      err.classList.add('show');
-      setTimeout(() => err.classList.remove('show'), 5000);
-    }
+      <form class="login-form" id="login-form" novalidate>
+        <div class="field">
+          <label for="username">Username</label>
+          <input id="username" name="username" type="text" required autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Masukkan username">
+        </div>
+        <div class="field">
+          <label for="password">Kata sandi</label>
+          <div class="password-field">
+            <input id="password" name="password" type="password" required autocomplete="current-password" placeholder="Masukkan kata sandi">
+            <button class="password-toggle" id="toggle-password" type="button" aria-label="Tampilkan kata sandi" aria-pressed="false">
+              <svg><use href="#i-eye" id="password-icon"/></svg>
+            </button>
+          </div>
+        </div>
+        <button class="btn" id="login-submit" type="submit">
+          <span id="login-submit-label">Masuk</span>
+        </button>
+      </form>
 
-    // Auto-focus username
-    document.getElementById('username').focus();
+      <div class="login-note">
+        <strong>Belum memiliki akun?</strong> Akun tidak dibuat melalui pendaftaran mandiri. Hubungi administrator atau kasubag TU untuk mendapatkan akses.
+      </div>
+    </div>
+  </main>
+</div>
 
-    // Check existing token
-    if (localStorage.getItem('token')) {
-      window.location.href = '/';
-    }
-  </script>
+<script src="/assets/login.js" defer></script>
 </body>
 </html>
