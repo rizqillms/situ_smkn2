@@ -185,7 +185,7 @@
           <p>Pencatatan surat yang diterima sekolah, lengkap dengan arsip pindaian bila tersedia.</p>
         </div>
         <div class="page-actions">
-          <button class="btn" type="button" data-action="toggle" data-target="form-sm"><svg><use href="#i-plus"/></svg>Input surat masuk</button>
+          <button class="btn" type="button" data-perm="suratWrite" data-action="toggle" data-target="form-sm"><svg><use href="#i-plus"/></svg>Input surat masuk</button>
         </div>
       </div>
 
@@ -233,7 +233,7 @@
           <p>Penerbitan surat resmi sekolah dengan penomoran otomatis per jenis dan tahun.</p>
         </div>
         <div class="page-actions">
-          <button class="btn" type="button" data-action="toggle" data-target="form-sk"><svg><use href="#i-plus"/></svg>Buat surat keluar</button>
+          <button class="btn" type="button" data-perm="suratWrite" data-action="toggle" data-target="form-sk"><svg><use href="#i-plus"/></svg>Buat surat keluar</button>
         </div>
       </div>
 
@@ -418,7 +418,7 @@
       <div class="segmented" role="tablist" aria-label="Jenis rekap">
         <button type="button" id="tab-absen" data-rekap="absen" role="tab" aria-selected="true" class="is-active">Rekap absensi</button>
         <button type="button" id="tab-surat" data-rekap="surat" role="tab" aria-selected="false">Rekap surat</button>
-        <button type="button" id="tab-pegawai" data-rekap="pegawai" role="tab" aria-selected="false">Rekap pegawai</button>
+        <button type="button" id="tab-pegawai" data-perm="pegawaiRead" data-rekap="pegawai" role="tab" aria-selected="false">Rekap pegawai</button>
       </div>
 
       <div id="rekap-absen">
