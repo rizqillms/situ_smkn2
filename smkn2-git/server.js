@@ -438,7 +438,7 @@ function detectUploadMime(filePath, filename) {
 function isUploadSignatureValid(file) {
   if (!file || !file.path) return false;
   const ext = path.extname(file.originalname || '').toLowerCase();
-  const mime = detectUploadMime(file.path, ext);
+  const mime = detectUploadMime(file.path, file.originalname || ext);
   const expected = {
     '.jpg': ['image/jpeg'], '.jpeg': ['image/jpeg'], '.png': ['image/png'], '.webp': ['image/webp'],
     '.pdf': ['application/pdf'], '.doc': ['application/x-ole-storage'], '.xls': ['application/x-ole-storage'],
