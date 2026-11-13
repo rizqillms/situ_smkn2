@@ -30,18 +30,18 @@
     profil: ['Akun', 'Profil saya']
   };
   const PERMS = {
-    suratRead: ['admin', 'kasubag', 'staff', 'kepsek'],
+    suratRead: ['admin', 'kasubag', 'staff'],
     suratWrite: ['admin', 'kasubag', 'staff'],
-    pegawaiRead: ['admin', 'kasubag', 'staff', 'kepsek'],
+    pegawaiRead: ['admin', 'kasubag', 'staff'],
     pegawaiWrite: ['admin', 'kasubag'],
-    rekapRead: ['admin', 'kasubag', 'staff', 'kepsek'],
-    logRead: ['admin', 'kasubag', 'kepsek'],
+    rekapRead: ['admin', 'kasubag', 'staff'],
+    logRead: ['admin', 'kasubag'],
     userManage: ['admin', 'kasubag'],
     backup: ['admin', 'kasubag'],
     laporanNilai: ['admin', 'kasubag'],
     laporanUpload: ['admin', 'kasubag', 'staff', 'guru'],
     absenAll: ['admin', 'kasubag'],
-    notifRead: ['admin', 'kasubag', 'kepsek']
+    notifRead: ['admin', 'kasubag']
   };
   const SECTION_PERMS = {
     dashboard: null,
@@ -76,7 +76,9 @@
   const today = localISO(now);
 
   const can = (perm) => !perm || (PERMS[perm] || []).includes(role);
-  const sectionAllowed = (section) => can(SECTION_PERMS[section]);
+  const sectionAllowed = (section) => role === 'kepsek'
+    ? ['dashboard', 'absensi', 'laporan'].includes(section)
+    : can(SECTION_PERMS[section]);
 
   const icon = (name) => `<svg aria-hidden="true"><use href="#i-${name}"/></svg>`;
   const esc = (value) => String(value ?? '')
@@ -390,16 +392,18 @@
 
   async function loadDashboard() {
     const isGuru = role === 'guru';
-    const [sm, sk, pg, absen] = await Promise.all([
+    const isKepsek = role === 'kepsek';
+    const [sm, sk, pg, absen, summary] = await Promise.all([
       can('suratRead') ? listOrEmpty('/api/surat-masuk') : Promise.resolve([]),
       can('suratRead') ? listOrEmpty('/api/surat-keluar') : Promise.resolve([]),
-      listOrEmpty('/api/pegawai'),
-      listOrEmpty('/api/absensi')
+      isKepsek ? Promise.resolve([]) : listOrEmpty('/api/pegawai'),
+      isKepsek ? Promise.resolve([]) : listOrEmpty('/api/absensi'),
+      isKepsek ? apiJson('/api/dashboard/summary') : Promise.resolve(null)
     ]);
 
-    const hadir = absen.filter(item => item.status === 'Hadir').length;
-    const telat = absen.filter(item => Number(item.telat_menit) > 0).length;
-    const total = pg.length;
+    const hadir = summary ? Number(summary.hadir || 0) : absen.filter(item => item.status === 'Hadir').length;
+    const telat = summary ? Number(summary.telat || 0) : absen.filter(item => Number(item.telat_menit) > 0).length;
+    const total = summary ? Number(summary.totalPegawai || 0) : pg.length;
     const percentage = total ? Math.min(100, Math.round(hadir / total * 100)) : 0;
 
     const setText = (id, value) => { const el = $(id); if (el) el.textContent = String(value); };
@@ -881,6 +885,31 @@
       state.pegawai = Array.isArray(pegawai) ? pegawai : [];
       state.absensi = Array.isArray(absensi) ? absensi : [];
       const recorded = new Map(state.absensi.map(row => [Number(row.pegawai_id), row]));
+      const canRecordAll = can('absenAll');
+      const ownId = Number(currentUser.pegawai_id || 0);
+      const eligiblePeople = canRecordAll
+        ? state.pegawai
+        : state.pegawai.filter(person => ownId && Number(person.id) === ownId);
+      const availablePeople = eligiblePeople.filter(person => !recorded.has(Number(person.id)));
+      const employeeSelect = $('absen-pegawai');
+      const previousSelection = employeeSelect.value;
+      employeeSelect.innerHTML = availablePeople.length
+        ? availablePeople.map(person => `<option value="${Number(person.id)}">${esc(person.nama || 'Pegawai')}</option>`).join('')
+        : '<option value="">Tidak ada pegawai yang dapat diabsen</option>';
+      if (availablePeople.some(person => String(person.id) === previousSelection)) employeeSelect.value = previousSelection;
+      const isToday = date === today;
+      const entryPanel = $('absen-entry-panel');
+      if (entryPanel) entryPanel.classList.toggle('hidden', !isToday);
+      employeeSelect.disabled = !isToday || !availablePeople.length || (!canRecordAll && !ownId);
+      $('absen-submit').disabled = employeeSelect.disabled;
+      $('absen-form-hint').textContent = !isToday
+        ? 'Tanggal arsip dipilih. Input absensi hanya tersedia untuk hari ini.'
+        : !ownId && !canRecordAll
+          ? 'Akun ini belum terhubung dengan data pegawai. Hubungi administrator.'
+          : !availablePeople.length
+            ? 'Tidak ada pegawai yang belum melakukan absensi pada tanggal ini.'
+            : 'Absensi Hadir memerlukan izin lokasi dan hanya dapat dilakukan dalam radius 300 meter dari sekolah.';
+      updateAbsensiFormState();
       const hadir = state.absensi.filter(row => row.status === 'Hadir').length;
       const telat = state.absensi.filter(row => Number(row.telat_menit) > 0).length;
       const belum = Math.max(0, state.pegawai.length - recorded.size);
@@ -888,7 +917,6 @@
       $('absen-chip-hadir').textContent = String(hadir);
       $('absen-chip-telat').textContent = String(telat);
       $('absen-chip-belum').textContent = String(belum);
-      const isToday = date === today;
       $('absen-caption').textContent = isToday
         ? 'Absensi hari ini. Tombol aktif tersedia pada pegawai yang belum tercatat.'
         : `Arsip kehadiran ${formatDate(date)}. Hanya dapat dilihat.`;
@@ -898,8 +926,6 @@
         body.innerHTML = emptyRow(5, 'Belum ada data pegawai', 'Absensi memerlukan data pegawai yang terhubung.', 'users');
         return;
       }
-      const canRecordAll = can('absenAll');
-      const ownId = Number(currentUser.pegawai_id || 0);
       body.innerHTML = state.pegawai.map((person) => {
         const row = recorded.get(Number(person.id));
         const isOwn = ownId && Number(person.id) === ownId;
@@ -927,6 +953,49 @@
       }).join('');
     } catch (error) { handleError(error); }
     finally { absenLoading = false; }
+  }
+
+  function updateAbsensiFormState() {
+    const status = $('absen-status')?.value || 'Hadir';
+    const note = $('absen-keterangan');
+    const label = $('absen-note-label');
+    const required = status === 'Izin' || status === 'Sakit';
+    if (note) {
+      note.required = required;
+      note.placeholder = required ? 'Tuliskan alasan atau keterangan pendukung' : 'Isi keterangan jika diperlukan';
+    }
+    if (label) label.innerHTML = required ? 'Keterangan <span class="required">*</span>' : 'Keterangan (opsional)';
+  }
+
+  async function submitAbsensiForm(event) {
+    event.preventDefault();
+    if (($('absen-date-input').value || today) !== today) {
+      toast('Absensi hanya dapat dicatat untuk hari ini.', 'error');
+      return;
+    }
+    const pegawaiId = Number($('absen-pegawai').value);
+    const status = $('absen-status').value;
+    const keterangan = $('absen-keterangan').value.trim();
+    if (!pegawaiId) {
+      toast('Pilih pegawai yang akan melakukan absensi.', 'error');
+      return;
+    }
+    if ((status === 'Izin' || status === 'Sakit') && !keterangan) {
+      toast('Keterangan wajib diisi untuk status Izin atau Sakit.', 'error');
+      $('absen-keterangan').focus();
+      return;
+    }
+    const button = $('absen-submit');
+    button.disabled = true;
+    try {
+      await postAbsen(pegawaiId, status, keterangan);
+      $('absen-keterangan').value = '';
+    } catch (error) {
+      handleError(error);
+    } finally {
+      button.disabled = false;
+      updateAbsensiFormState();
+    }
   }
 
   function getPosition() {
@@ -1120,10 +1189,9 @@
     }
     const canGrade = can('laporanNilai');
     body.innerHTML = state.laporan.map((item) => {
-      const evidence = [
-        item.foto ? `<button class="btn btn-secondary btn-small" type="button" data-action="open-file" data-file="${esc(item.foto)}">${icon('eye')}Foto</button>` : '',
-        item.file_laporan ? `<button class="btn btn-secondary btn-small" type="button" data-action="open-file" data-file="${esc(item.file_laporan)}">${icon('download')}Berkas</button>` : ''
-      ].filter(Boolean).join(' ');
+      const evidence = item.file_laporan
+        ? `<button class="btn btn-secondary btn-small" type="button" data-action="open-file" data-file="${esc(item.file_laporan)}">${icon('download')}Dokumentasi</button>`
+        : '';
       const grading = canGrade
         ? `<div style="display:flex;flex-direction:column;gap:5px;min-width:148px;">
              <input id="nilai-${Number(item.id)}" value="${esc(item.nilai || '')}" placeholder="Nilai, mis. A" aria-label="Nilai ${esc(item.nama)}" style="min-height:31px;padding:5px 8px;font-size:11px;">
@@ -1415,6 +1483,8 @@
     $('sk-tanggal').addEventListener('change', updateNomor);
     $('sk-tanggal').addEventListener('input', debounce(updateNomor, 250));
     $('absen-date-input').addEventListener('change', () => loadAbsen().catch(handleError));
+    $('absen-form').addEventListener('submit', submitAbsensiForm);
+    $('absen-status').addEventListener('change', updateAbsensiFormState);
 
     $('search-sm').addEventListener('input', renderSM);
     $('search-sk').addEventListener('input', renderSK);
