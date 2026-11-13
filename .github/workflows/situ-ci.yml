@@ -2,7 +2,7 @@ name: SITU CI
 
 on:
   push:
-    branches: [main, hardening/phase-1, 'uiux/**']
+    branches: [main, hardening/phase-1, 'uiux/**', 'fix/**']
   pull_request:
     branches: [main, hardening/phase-1]
 
@@ -23,19 +23,20 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
       - name: Check backend syntax
         run: node --check server.js
-      - name: Check inline frontend scripts
+      - name: Check frontend syntax
         run: |
-          python - <<'PY'
+          python3 - <<'PY'
           import re
           from pathlib import Path
           html = Path('public/index.html').read_text(encoding='utf-8')
-          scripts = re.findall(r'<script\b[^>]*>(.*?)</script>', html, re.S | re.I)
+          scripts = re.findall(r'<script\b(?![^>]*\bsrc=)[^>]*>(.*?)</script>', html, re.S | re.I)
           inline = [s for s in scripts if s.strip()]
           for i, script in enumerate(inline, 1):
               Path(f'/tmp/situ-inline-{i}.js').write_text(script, encoding='utf-8')
-          print(f'Found {len(inline)} inline script(s)')
+          print(f'Found {len(inline)} inline script(s) in index.html')
           PY
           for file in /tmp/situ-inline-*.js; do [ -e "$file" ] && node --check "$file"; done
+          for file in public/assets/*.js; do node --check "$file"; done
       - name: Smoke test isolated startup and key workflows
         run: |
           tmpdir="$(mktemp -d)"
@@ -97,6 +98,20 @@ jobs:
             }, admin);
             assert.equal(izin.response.status, 200, 'Izin with note accepted');
 
+            const nextPromotion = new Date();
+            nextPromotion.setDate(nextPromotion.getDate() + 60);
+            const promotion = await call('/api/pegawai', 'POST', {
+              nama: 'CI Pangkat', jenis_pegawai: 'PNS', nip: '199001012020011009', golongan: 'III/a',
+              periode_tahun: String(nextPromotion.getFullYear() - 4), periode_bulan: String(nextPromotion.getMonth() + 1)
+            }, admin);
+            assert.equal(promotion.response.status, 200, 'create employee with promotion period');
+            const reminders = await call('/api/pegawai/notifikasi', 'GET', undefined, admin);
+            assert.equal(reminders.response.status, 200, 'promotion reminders accessible');
+            const reminder = reminders.data.find(x => x.nama === 'CI Pangkat');
+            assert.ok(reminder, 'scheduled promotion appears in reminders');
+            assert.match(reminder.tanggal_naik_berikutnya, /^\d{4}-\d{2}-\d{2}$/, 'reminder date is normalized');
+            assert.ok(reminder.sisa_hari >= 0 && reminder.sisa_hari <= 150, 'reminder falls inside the 150-day window');
+
             const parts = new Intl.DateTimeFormat('en-US', {
               timeZone: 'Asia/Makassar', year: 'numeric', month: '2-digit'
             }).formatToParts(new Date()).reduce((a, p) => (a[p.type] = p.value, a), {});
@@ -122,6 +137,46 @@ jobs:
             const authorizedFile = await fetch(base + '/uploads/' + uploadedFile, { headers: { 'x-auth-token': admin } });
             assert.equal(authorizedFile.status, 200, 'authorized file download');
 
+            const preview = await call('/api/surat-keluar/next-number?jenis=400.3.8&tahun=2026', 'GET', undefined, admin);
+            assert.equal(preview.response.status, 200, 'letter number preview accessible');
+            assert.match(preview.data.nomor, /^400\.3\.8\/\d{3}\/SMKN2RTU\/2026$/, 'letter number format');
+            const outgoing = await call('/api/surat-keluar', 'POST', {
+              nomor: 'CI-CLIENT/999', tanggal: '2026-11-10', tujuan: 'CI', perihal: 'CI numbering', jenis: '400.3.8'
+            }, admin);
+            assert.equal(outgoing.response.status, 200, 'create outgoing letter');
+            assert.equal(outgoing.data.nomor, preview.data.nomor, 'server assigns sequence and ignores client number');
+            const outgoingPdf = await fetch(base + '/api/surat-keluar/' + outgoing.data.id + '/pdf', { headers: { 'x-auth-token': admin } });
+            assert.equal(outgoingPdf.status, 200, 'outgoing letter PDF');
+            assert.ok((outgoingPdf.headers.get('content-type') || '').includes('pdf'), 'PDF content type');
+
+            const template = await fetch(base + '/api/pegawai/template', { headers: { 'x-auth-token': admin } });
+            assert.equal(template.status, 200, 'employee template download');
+            assert.ok((template.headers.get('content-type') || '').includes('spreadsheet'), 'template is an Excel file');
+            const ExcelJS = require('exceljs');
+            const workbook = new ExcelJS.Workbook();
+            const sheet = workbook.addWorksheet('Data Pegawai');
+            sheet.addRow(['Nama Lengkap', 'Jenis Kelamin', 'Tanggal Lahir', 'NIP', 'Status Kepegawaian', 'Jabatan', 'Golongan', 'Periode Tahun', 'Periode Bulan']);
+            sheet.addRow(['CI Import', 'Perempuan', '1992-03-15', '199203152020012003', 'PNS', 'Guru CI', 'III/a', 2021, 6]);
+            const importForm = new FormData();
+            importForm.set('file', new Blob([await workbook.xlsx.writeBuffer()], {
+              type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            }), 'ci-import.xlsx');
+            const importResponse = await fetch(base + '/api/pegawai/import', {
+              method: 'POST', headers: { 'x-auth-token': admin }, body: importForm
+            });
+            assert.equal(importResponse.status, 200, 'employee import accepted');
+            const importResult = await importResponse.json();
+            assert.equal(importResult.berhasil, 1, 'one employee imported from Excel');
+            const duplicateImport = new FormData();
+            duplicateImport.set('file', new Blob([await workbook.xlsx.writeBuffer()], {
+              type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            }), 'ci-import.xlsx');
+            const duplicateResponse = await fetch(base + '/api/pegawai/import', {
+              method: 'POST', headers: { 'x-auth-token': admin }, body: duplicateImport
+            });
+            assert.equal(duplicateResponse.status, 200, 'duplicate import handled');
+            assert.equal((await duplicateResponse.json()).dilewati, 1, 'duplicate employee skipped');
+
             const backupResponse = await fetch(base + '/api/backup', { headers: { 'x-auth-token': admin } });
             assert.equal(backupResponse.status, 200, 'SQLite and uploads backup');
             assert.ok((backupResponse.headers.get('content-type') || '').includes('application/zip'), 'backup is a ZIP archive');
@@ -134,6 +189,7 @@ jobs:
               nama: 'CI Guru', role: 'guru', pegawai_id: hadirId
             }, admin);
             assert.equal(makeGuru.response.status, 200, 'create teacher account');
+            assert.ok(makeGuru.data.id, 'created account returns its id');
             const guruLogin = await call('/api/login', 'POST', {
               username: 'ci-guru', password: 'ci-guru-password-2026'
             });

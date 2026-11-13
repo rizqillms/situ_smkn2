@@ -2,11 +2,26 @@
 
 Aplikasi tata usaha sekolah untuk arsip surat, absensi pegawai berbasis GPS, data kepegawaian, laporan bulanan, rekap Excel, dan akun multi-role.
 
+## Fitur utama
+- **Surat masuk dan keluar** — pencatatan surat, arsip pindaian, PDF surat resmi, dan penomoran keluar otomatis per jenis dan tahun.
+- **Absensi** — validasi geofence 300 meter, batas masuk 08.00 WITA, keterangan izin/sakit, dan rekap bulanan.
+- **Kepegawaian** — data PNS/PPPK/Guru Non ASN/PJLP, import Excel dengan template resmi, serta pengingat kenaikan pangkat empat tahunan.
+- **Laporan bulanan** — unggah laporan per divisi, penilaian kasubag, dan rekap per divisi.
+- **Rekap dan ekspor** — rekap absensi, surat, dan pegawai dalam bentuk Excel.
+- **Akses berbasis peran** — admin, kasubag, staff TU, kepala sekolah, dan guru dengan pembatasan di backend.
+- **Operasional** — log aktivitas, cadangan ZIP (database + unggahan), health check `/healthz`, dan sesi 24 jam.
+
+## Struktur singkat
+- `server.js` — API Express, SQLite, validasi, keamanan, PDF, import, dan backup.
+- `public/index.html` — shell aplikasi dengan seluruh section.
+- `public/login.html` — halaman masuk.
+- `public/assets/` — `app.css`, `components.css`, `app.js`, `login.js`, dan favicon.
+
 ## Stack
 - Node.js 20+
 - Express
 - SQLite (better-sqlite3)
-- HTML/CSS/JavaScript frontend
+- HTML/CSS/JavaScript frontend (tanpa framework)
 
 ## Menjalankan secara lokal
 1. Masuk ke folder `smkn2-git`.
