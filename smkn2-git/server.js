@@ -190,7 +190,12 @@ function cleanText(value, max = 500) {
   return String(value).trim().slice(0, max);
 }
 function isDateOnly(value) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  if (year < 1 || month < 1 || month > 12 || day < 1) return false;
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return day <= daysInMonth[month - 1];
 }
 function optionalText(value, max = 300) {
   return cleanText(value, max) || null;
@@ -366,9 +371,13 @@ app.post('/api/ganti-password', requireAuth, (req, res) => {
   const { lama, baru } = req.body;
   if (typeof baru !== 'string' || baru.length < 12 || baru.length > 200) return res.status(400).json({ error: 'Password baru minimal 12 karakter' });
   if (!verifyPass(lama, req.user.password_hash)) return res.status(400).json({ error: 'Password lama salah' });
-  db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hashPass(baru), req.user.id);
-  log(req.user, 'Ganti Password', 'Password berhasil diganti');
-  res.json({ ok: true });
+  const updatePassword = db.transaction(() => {
+    db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hashPass(baru), req.user.id);
+    db.prepare('DELETE FROM sessions WHERE user_id=?').run(req.user.id);
+  });
+  updatePassword();
+  log(req.user, 'Ganti Password', 'Password berhasil diganti; seluruh sesi dicabut');
+  res.json({ ok: true, reauth_required: true });
 });
 
 // Upload config
@@ -403,26 +412,50 @@ const upload = multer({
   }
 });
 function detectUploadMime(filePath, filename) {
-  const byExtension = uploadMimeByExtension[path.extname(filename).toLowerCase()];
-  if (byExtension) return byExtension;
-  let fd = null;
-  try {
-    fd = fs.openSync(filePath, 'r');
-    const buffer = Buffer.alloc(12);
-    const read = fs.readSync(fd, buffer, 0, buffer.length, 0);
-    const head = buffer.subarray(0, read);
-    if (head.subarray(0, 4).toString('latin1') === '%PDF') return 'application/pdf';
-    if (head[0] === 0x89 && head.subarray(1, 4).toString('latin1') === 'PNG') return 'image/png';
-    if (head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) return 'image/jpeg';
-    if (head.subarray(0, 4).toString('latin1') === 'RIFF' && head.subarray(8, 12).toString('latin1') === 'WEBP') return 'image/webp';
-  } catch (err) {
-    return 'application/octet-stream';
-  } finally {
-    if (fd !== null) {
-      try { fs.closeSync(fd); } catch (err) { /* abaikan */ }
-    }
+  let buffer;
+  try { buffer = fs.readFileSync(filePath); } catch (err) { return 'application/octet-stream'; }
+  const head = buffer.subarray(0, 16);
+  const ext = path.extname(filename).toLowerCase();
+  if (head.subarray(0, 4).toString('latin1') === '%PDF-') return 'application/pdf';
+  if (head[0] === 0x89 && head.subarray(1, 4).toString('latin1') === 'PNG' && head.subarray(4, 8).equals(Buffer.from([0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+  if (head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) return 'image/jpeg';
+  if (head.subarray(0, 4).toString('latin1') === 'RIFF' && head.subarray(8, 12).toString('latin1') === 'WEBP') return 'image/webp';
+  if (head.subarray(0, 8).equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]))) return 'application/x-ole-storage';
+  if (head[0] === 0x50 && head[1] === 0x4b && [0x03, 0x05, 0x07].includes(head[2]) && [0x04, 0x06, 0x08].includes(head[3])) {
+    const names = buffer.toString('latin1');
+    if (names.includes('word/document.xml')) return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    if (names.includes('xl/workbook.xml')) return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    return 'application/zip';
+  }
+  if (ext === '.csv' && buffer.length > 0 && !buffer.includes(0)) {
+    try {
+      new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+      return 'text/csv; charset=utf-8';
+    } catch (err) { return 'application/octet-stream'; }
   }
   return 'application/octet-stream';
+}
+function isUploadSignatureValid(file) {
+  if (!file || !file.path) return false;
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  const mime = detectUploadMime(file.path, ext);
+  const expected = {
+    '.jpg': ['image/jpeg'], '.jpeg': ['image/jpeg'], '.png': ['image/png'], '.webp': ['image/webp'],
+    '.pdf': ['application/pdf'], '.doc': ['application/x-ole-storage'], '.xls': ['application/x-ole-storage'],
+    '.docx': ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+    '.xlsx': ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+    '.csv': ['text/csv; charset=utf-8']
+  };
+  return Boolean(expected[ext] && expected[ext].includes(mime));
+}
+function validateUploadedFiles(req, res, next) {
+  const files = req.file ? [req.file] : Object.values(req.files || {}).flat();
+  const invalid = files.filter(file => !isUploadSignatureValid(file));
+  if (invalid.length) {
+    files.forEach(discardUpload);
+    return res.status(400).json({ error: 'Isi file tidak sesuai dengan format ekstensi. Pastikan file asli dan tidak rusak.' });
+  }
+  next();
 }
 function discardUpload(file) {
   if (file && file.path) fs.promises.unlink(file.path).catch(() => {});
@@ -457,7 +490,7 @@ app.get('/api/surat-masuk', requireRole('admin','kasubag','staff','kepsek'), (re
   const rows = db.prepare('SELECT * FROM surat_masuk ORDER BY tanggal DESC').all();
   res.json(rows);
 });
-app.post('/api/surat-masuk', requireRole('admin','kasubag','staff'), upload.single('foto'), (req, res) => {
+app.post('/api/surat-masuk', requireRole('admin','kasubag','staff'), upload.single('foto'), validateUploadedFiles, (req, res) => {
   const nomor = cleanText(req.body.nomor, 120);
   const tanggal = cleanText(req.body.tanggal, 10);
   const dari = cleanText(req.body.dari, 160);
@@ -690,7 +723,15 @@ app.post('/api/absensi', requireAuth, (req, res) => {
   const pegawaiId = Number(pegawai_id);
   if (!Number.isInteger(pegawaiId) || pegawaiId <= 0) return res.status(400).json({ error: 'Pegawai tidak valid' });
   if (!db.prepare('SELECT id FROM pegawai WHERE id=?').get(pegawaiId)) return res.status(404).json({ error: 'Data pegawai tidak ditemukan' });
-  if (req.user.role === 'guru' && req.user.pegawai_id !== pegawaiId) return res.status(403).json({ error: 'Guru hanya bisa absen untuk diri sendiri' });
+  if (!['admin', 'kasubag'].includes(req.user.role)) {
+    const ownPegawaiId = Number(req.user.pegawai_id);
+    if (!Number.isInteger(ownPegawaiId) || ownPegawaiId <= 0) {
+      return res.status(403).json({ error: 'Akun belum terhubung ke data pegawai. Hubungi administrator.' });
+    }
+    if (ownPegawaiId !== pegawaiId) {
+      return res.status(403).json({ error: 'Anda hanya dapat melakukan absensi untuk diri sendiri.' });
+    }
+  }
 
   const note = typeof keterangan === 'string' ? keterangan.trim() : '';
   if ((status === 'Izin' || status === 'Sakit') && !note) return res.status(400).json({ error: 'Keterangan wajib diisi untuk Izin/Sakit' });
@@ -891,7 +932,7 @@ app.get('/api/laporan', requireAuth, (req, res) => {
   }
   res.json(rows);
 });
-app.post('/api/laporan', requireAuth, upload.fields([{name:'foto',maxCount:1},{name:'file_laporan',maxCount:1}]), (req, res) => {
+app.post('/api/laporan', requireAuth, upload.fields([{name:'foto',maxCount:1},{name:'file_laporan',maxCount:1}]), validateUploadedFiles, (req, res) => {
   const pegawaiId = Number(req.body.pegawai_id);
   const divisi = cleanText(req.body.divisi, 120);
   const bulan = cleanText(req.body.bulan, 7);
@@ -1099,7 +1140,7 @@ app.get('/api/pegawai/template', requireRole('admin','kasubag'), async (req, res
   res.end();
 });
 
-app.post('/api/pegawai/import', requireRole('admin','kasubag'), upload.single('file'), async (req, res) => {
+app.post('/api/pegawai/import', requireRole('admin','kasubag'), upload.single('file'), validateUploadedFiles, async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'File Excel belum dipilih.' });
   if (path.extname(req.file.originalname || '').toLowerCase() !== '.xlsx') {
     discardUpload(req.file);
