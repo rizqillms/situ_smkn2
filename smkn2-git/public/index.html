@@ -14,8 +14,6 @@
 <link rel="stylesheet" href="/assets/components.css">
 </head>
 <body>
-<a class="skip-link" href="#main-content">Lewati navigasi</a>
-
 <svg width="0" height="0" class="sr-only" aria-hidden="true" focusable="false">
   <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.4"/><rect x="14" y="3" width="7" height="7" rx="1.4"/><rect x="3" y="14" width="7" height="7" rx="1.4"/><rect x="14" y="14" width="7" height="7" rx="1.4"/></symbol>
   <symbol id="i-inbox" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z"/><path d="M4 13h4l2 3h4l2-3h4"/></symbol>
@@ -295,6 +293,21 @@
         <div><strong>Geofence sekolah aktif.</strong> Radius resmi 300 meter dari titik sekolah. Batas jam masuk 08.00; keterlambatan tetap tercatat pada rekap.</div>
       </div>
 
+      <div class="panel form-panel" id="absen-entry-panel">
+        <div class="panel-head">
+          <div><h3>Input absensi</h3><p>Pilih pegawai dan status kehadiran. Untuk status Hadir, izinkan akses lokasi dan pastikan berada di area sekolah.</p></div>
+        </div>
+        <form id="absen-form">
+          <div class="form-grid">
+            <div class="field"><label for="absen-pegawai">Nama pegawai <span class="required">*</span></label><select id="absen-pegawai" name="pegawai_id" required></select></div>
+            <div class="field"><label for="absen-status">Status kehadiran <span class="required">*</span></label><select id="absen-status" name="status" required><option value="Hadir">Hadir</option><option value="Izin">Izin</option><option value="Sakit">Sakit</option></select></div>
+            <div class="field span-2"><label for="absen-keterangan" id="absen-note-label">Keterangan (opsional)</label><textarea id="absen-keterangan" name="keterangan" rows="2" placeholder="Isi keterangan jika diperlukan"></textarea></div>
+          </div>
+          <p class="hint" id="absen-form-hint">Absensi hanya dapat dicatat untuk hari ini.</p>
+          <div class="form-actions"><button class="btn" id="absen-submit" type="submit">Simpan absensi</button></div>
+        </form>
+      </div>
+
       <div class="chip-row">
         <span class="chip">Tanggal <strong id="absen-date">—</strong></span>
         <span class="chip is-emerald">Hadir <strong id="absen-chip-hadir">0</strong></span>
@@ -489,7 +502,7 @@
         </div>
       </div>
 
-      <div class="form-panel hidden" id="form-lap">
+      <div class="form-panel hidden" id="form-lap" data-perm="laporanUpload">
         <div class="panel-head">
           <div><h3>Upload laporan kegiatan</h3><p>Laporan yang sudah ada pada bulan yang sama akan diperbarui.</p></div>
         </div>
@@ -503,8 +516,7 @@
             <div class="field"><label for="lap-realisasi">Realisasi</label><input id="lap-realisasi" name="realisasi" placeholder="Contoh: 9 kegiatan"></div>
             <div class="field"><label for="lap-kendala">Kendala</label><input id="lap-kendala" name="kendala" placeholder="Kendala yang dihadapi"></div>
             <div class="field span-2"><label for="lap-catatan">Catatan untuk kasubag</label><textarea id="lap-catatan" name="catatan" rows="2"></textarea></div>
-            <div class="field"><label for="lap-foto">Foto bukti kegiatan</label><input id="lap-foto" name="foto" type="file" accept="image/*"></div>
-            <div class="field"><label for="lap-file">Berkas laporan</label><input id="lap-file" name="file_laporan" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx"><span class="hint">PDF, DOC, atau Excel. Maksimal 10 MB.</span></div>
+            <div class="field span-2"><label for="lap-file">Dokumentasi kegiatan</label><input id="lap-file" name="file_laporan" type="file" accept=".pdf,.xls,.xlsx,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"><span class="hint">Lampirkan dokumentasi dalam format PDF atau Excel (.xls/.xlsx). Maksimal 10 MB.</span></div>
           </div>
           <div class="form-actions">
             <button class="btn" type="submit">Simpan laporan</button>
@@ -520,7 +532,7 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Pegawai</th><th>Divisi</th><th>Kegiatan</th><th>Target / realisasi</th><th>Bukti</th><th>Status</th><th>Penilaian</th></tr></thead>
+            <thead><tr><th>Pegawai</th><th>Divisi</th><th>Kegiatan</th><th>Target / realisasi</th><th>Dokumentasi</th><th>Status</th><th>Penilaian</th></tr></thead>
             <tbody id="list-laporan"></tbody>
           </table>
         </div>
