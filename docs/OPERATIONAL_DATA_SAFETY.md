@@ -1,8 +1,9 @@
 # Operational Safety — SITU SMKN 2 Rantau
 
-## Confirmed requirements
+## Confirmed requirements and hosting context
 - The owner reports that entered records have disappeared after system updates/deployments.
-- The actual hosting provider, active DATA_DIR value, persistent-volume attachment, and current database location have not yet been independently verified.
+- The owner has confirmed that the website is hosted on Railway Free.
+- The existence of a Railway persistent volume, its attached service, mount path, active DATA_DIR value, and exact location of the current database are still unverified.
 - Treat the current data source as operational data. Do not assume the GitHub repository contains or can reconstruct it.
 - Official attendance geofence: 300 meters from the school's approved reference point.
 - Approved school reference point: latitude -2.9317903, longitude 115.1820055.
@@ -31,11 +32,15 @@
 - [x] Confirm exact school reference coordinates.
 - [x] Confirm official 300-meter attendance radius.
 - [x] Confirm current exception workflow is user-entered notes recorded for monthly reporting.
+- [x] Confirm hosting provider: Railway Free.
+- [ ] Verify Railway persistent volume exists and is attached to the production SITU service.
+- [ ] Verify volume mount path and active DATA_DIR (recommended: mount /data and DATA_DIR=/data).
+- [ ] Download a backup from the currently running service, including database and uploads.
+- [ ] Verify backup archive and restore it on an isolated copy.
+- [ ] Restore verified database and uploads to the persistent volume before switching DATA_DIR.
+- [ ] Verify database integrity, record counts, uploaded file references, and application workflows after cutover.
+- [ ] Set up off-site backup schedule and test restore.
 - [ ] Review GPS accuracy handling (separate from the official 300-meter radius).
-- [ ] Create and restore-test a backup of the current database and uploads.
-- [ ] Confirm the live hosting provider, active DATA_DIR, persistent-volume mount, and exact location of the current data.db and uploads.
-- [ ] Select persistent production database and file storage.
-- [ ] Download a backup from the current live source and verify/restore it on an isolated copy before the next deployment.
 - [ ] Rotate all demo/default credentials and provision named accounts.
 - [x] Initial endpoint authorization and upload protections implemented; [ ] final manual review of every endpoint and role.
 - [ ] Test migration and rollback on a sanitized copy.
@@ -50,6 +55,6 @@
 - Automated tests use a temporary database and synthetic records only.
 
 ## Current decision
-The repository contains application source only, not the operational database or uploaded files. The owner has reported data loss after updates, but the active host and persistent storage have not yet been verified. Stop routine deployments until the data owner has downloaded a backup from the actual running environment (or recovered the previous host disk/local database), verified it, and completed a restore test on an isolated copy.
+The repository contains application source only, not the operational database or uploaded files. The owner has reported data loss after updates, and Railway is now confirmed as the hosting provider, but the active persistent volume and current data location remain unverified. Stop production deployment changes until the data owner has downloaded a backup from the currently running service (or recovered the previous host disk/local database), verified it, and completed a restore test on an isolated copy.
 
-The application must use one stable persistent DATA_DIR for both SQLite and uploads. A production startup guard now refuses to create an empty database when the initialized storage is missing its database file. This guard reduces silent data resets but does not replace off-site backups or recovery of records already lost.
+The application must use one stable persistent DATA_DIR for both SQLite and uploads. The production startup guard refuses to create an empty database when initialized storage loses its database file. This guard reduces silent data resets but does not replace off-site backups or recover records already lost.
