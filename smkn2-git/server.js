@@ -46,10 +46,32 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Database
-const dataDir = process.env.DATA_DIR || __dirname;
+// Database and persistent-storage safety.
+const isProduction = process.env.NODE_ENV === 'production';
+const configuredDataDir = String(process.env.DATA_DIR || '').trim();
+if (isProduction && !configuredDataDir) {
+  throw new Error('DATA_DIR wajib diarahkan ke persistent disk pada production. Startup dihentikan untuk mencegah database tersimpan di filesystem sementara.');
+}
+const dataDir = path.resolve(configuredDataDir || __dirname);
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+fs.accessSync(dataDir, fs.constants.R_OK | fs.constants.W_OK);
 const dbPath = path.join(dataDir, 'data.db');
+const storageMarker = path.join(dataDir, '.situ-storage-initialized');
+const databaseExists = fs.existsSync(dbPath);
+const markerExists = fs.existsSync(storageMarker);
+const orphanedSidecars = !databaseExists && (fs.existsSync(dbPath + '-wal') || fs.existsSync(dbPath + '-shm'));
+if (isProduction && orphanedSidecars) {
+  throw new Error('File database utama tidak ditemukan tetapi file SQLite WAL/SHM masih ada. Jangan membuat database baru; pulihkan backup terlebih dahulu.');
+}
+if (isProduction && markerExists && !databaseExists) {
+  throw new Error('Database operasional hilang dari persistent storage yang sebelumnya sudah diinisialisasi. Startup dihentikan agar data tidak tertimpa database kosong; pulihkan data.db dan folder uploads dari backup.');
+}
+if (isProduction && !databaseExists && !markerExists && process.env.ALLOW_EMPTY_DB_INIT !== 'true') {
+  throw new Error('Database belum ada. Inisialisasi pertama hanya boleh dilakukan secara sadar dengan ALLOW_EMPTY_DB_INIT=true setelah persistent disk dan backup sumber dipastikan.');
+}
+if (databaseExists && fs.statSync(dbPath).size === 0) {
+  throw new Error('File data.db kosong. Startup dihentikan untuk mencegah inisialisasi database baru di atas file operasional yang rusak.');
+}
 const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
@@ -152,6 +174,15 @@ try {
 } catch (err) {
   console.warn('Indeks absensi unik tidak dapat dibuat:', err.message);
 }
+
+if (!fs.existsSync(storageMarker)) {
+  fs.writeFileSync(storageMarker, JSON.stringify({
+    initialized_at: new Date().toISOString(),
+    database: 'data.db',
+    storage: 'persistent-directory'
+  }, null, 2), { flag: 'wx' });
+}
+console.log('Database SQLite aktif di:', dbPath);
 
 function purgeExpiredSessions() {
   try {
@@ -486,7 +517,7 @@ app.get('/uploads/:file', requireAuth, (req, res) => {
   stream.pipe(res);
 });
 // ========== SURAT MASUK ==========
-app.get('/api/surat-masuk', requireRole('admin','kasubag','staff'), (req, res) => {
+app.get('/api/surat-masuk', requireRole('admin','kasubag','staff','kepsek'), (req, res) => {
   const rows = db.prepare('SELECT * FROM surat_masuk ORDER BY tanggal DESC').all();
   res.json(rows);
 });
@@ -528,7 +559,7 @@ app.delete('/api/surat-masuk/:id', requireRole('admin','kasubag','staff'), (req,
 });
 
 // ========== SURAT KELUAR ==========
-app.get('/api/surat-keluar', requireRole('admin','kasubag','staff'), (req, res) => {
+app.get('/api/surat-keluar', requireRole('admin','kasubag','staff','kepsek'), (req, res) => {
   const rows = db.prepare('SELECT * FROM surat_keluar ORDER BY tanggal DESC').all();
   res.json(rows);
 });
@@ -580,7 +611,7 @@ app.delete('/api/surat-keluar/:id', requireRole('admin','kasubag','staff'), (req
   log(req.user, 'Surat Keluar', `Hapus surat ${row.nomor || ''}`);
   res.json({ ok: true });
 });
-app.get('/api/surat-keluar/:id/pdf', requireRole('admin','kasubag','staff'), (req, res) => {
+app.get('/api/surat-keluar/:id/pdf', requireRole('admin','kasubag','staff','kepsek'), (req, res) => {
   const s = db.prepare('SELECT * FROM surat_keluar WHERE id=?').get(req.params.id);
   if (!s) return res.status(404).send('Not found');
   const nomor = cleanText(s.nomor, 120) || `surat-${s.id}`;
@@ -775,7 +806,7 @@ app.post('/api/absensi', requireAuth, (req, res) => {
   res.json({ ok: true, tanggal: now.date, jam: now.time, telat: lateMinutes,
     jarak_meter: distance === null ? null : Math.round(distance) });
 });
-app.get('/api/absensi/rekap', requireRole('admin','kasubag','staff'), async (req, res) => {
+app.get('/api/absensi/rekap', requireRole('admin','kasubag','staff','kepsek'), async (req, res) => {
   const { bulan } = req.query;
   const rows = db.prepare(`
     SELECT p.nama,
@@ -790,7 +821,7 @@ app.get('/api/absensi/rekap', requireRole('admin','kasubag','staff'), async (req
   `).all(bulan + '%');
   res.json(rows);
 });
-app.get('/api/absensi/rekap/excel', requireRole('admin','kasubag','staff'), async (req, res) => {
+app.get('/api/absensi/rekap/excel', requireRole('admin','kasubag','staff','kepsek'), async (req, res) => {
   const { bulan } = req.query;
   const rows = db.prepare(`
     SELECT p.nama,
@@ -822,7 +853,7 @@ app.get('/api/absensi/rekap/excel', requireRole('admin','kasubag','staff'), asyn
 });
 
 // ========== REKAP SURAT ==========
-app.get('/api/rekap/surat', requireRole('admin','kasubag','staff'), (req, res) => {
+app.get('/api/rekap/surat', requireRole('admin','kasubag','staff','kepsek'), (req, res) => {
   const { bulan } = req.query;
   const sm = db.prepare("SELECT COUNT(*) as total, dari, perihal, tanggal FROM surat_masuk WHERE tanggal LIKE ? GROUP BY dari ORDER BY tanggal DESC").all(bulan + '%');
   const sk = db.prepare("SELECT COUNT(*) as total, tujuan, perihal, tanggal FROM surat_keluar WHERE tanggal LIKE ? GROUP BY tujuan ORDER BY tanggal DESC").all(bulan + '%');
@@ -830,7 +861,7 @@ app.get('/api/rekap/surat', requireRole('admin','kasubag','staff'), (req, res) =
   const totalKeluar = db.prepare("SELECT COUNT(*) as c FROM surat_keluar WHERE tanggal LIKE ?").get(bulan + '%');
   res.json({ totalMasuk: totalMasuk.c, totalKeluar: totalKeluar.c, masukRinci: sm, keluarRinci: sk });
 });
-app.get('/api/rekap/surat/excel', requireRole('admin','kasubag','staff'), async (req, res) => {
+app.get('/api/rekap/surat/excel', requireRole('admin','kasubag','staff','kepsek'), async (req, res) => {
   const { bulan } = req.query;
   const sm = db.prepare("SELECT nomor, tanggal, dari, perihal FROM surat_masuk WHERE tanggal LIKE ? ORDER BY tanggal").all(bulan + '%');
   const sk = db.prepare("SELECT nomor, tanggal, tujuan, perihal FROM surat_keluar WHERE tanggal LIKE ? ORDER BY tanggal").all(bulan + '%');

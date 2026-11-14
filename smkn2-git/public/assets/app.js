@@ -30,11 +30,11 @@
     profil: ['Akun', 'Profil saya']
   };
   const PERMS = {
-    suratRead: ['admin', 'kasubag', 'staff'],
+    suratRead: ['admin', 'kasubag', 'staff', 'kepsek'],
     suratWrite: ['admin', 'kasubag', 'staff'],
     pegawaiRead: ['admin', 'kasubag', 'staff'],
     pegawaiWrite: ['admin', 'kasubag'],
-    rekapRead: ['admin', 'kasubag', 'staff'],
+    rekapRead: ['admin', 'kasubag', 'staff', 'kepsek'],
     logRead: ['admin', 'kasubag'],
     userManage: ['admin', 'kasubag'],
     backup: ['admin', 'kasubag'],
@@ -77,7 +77,7 @@
 
   const can = (perm) => !perm || (PERMS[perm] || []).includes(role);
   const sectionAllowed = (section) => role === 'kepsek'
-    ? ['dashboard', 'absensi', 'laporan'].includes(section)
+    ? ['dashboard', 'surat-masuk', 'surat-keluar', 'absensi', 'rekap', 'laporan'].includes(section)
     : can(SECTION_PERMS[section]);
 
   const icon = (name) => `<svg aria-hidden="true"><use href="#i-${name}"/></svg>`;
@@ -1071,6 +1071,7 @@
 
   /* ---------- Rekap ---------- */
   function switchRekap(tab) {
+    if (tab === 'pegawai' && !can('pegawaiRead')) tab = 'absen';
     ['absen', 'surat', 'pegawai'].forEach((name) => {
       const panel = $('rekap-' + name);
       const button = $('tab-' + name);

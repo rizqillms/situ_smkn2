@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: smkn2-rantau-tu
+    runtime: node
+    rootDir: smkn2-git
+    plan: starter
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: 20.19.5
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY_HOPS
+        value: 1
+      - key: DATA_DIR
+        value: /var/data
+    disk:
+      name: situ-data
+      mountPath: /var/data
+      sizeGB: 1
+
+# First installation only:
+# Set ALLOW_EMPTY_DB_INIT=true in the hosting dashboard after verifying the disk.
+# Remove it after the first successful start. Never set it to recover missing live data.
